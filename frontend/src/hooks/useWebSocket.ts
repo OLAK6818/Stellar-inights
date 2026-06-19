@@ -245,6 +245,7 @@ export function useWebSocket(
   return {
     isConnected,
     isConnecting,
+    isStaleData,
     lastMessage,
     connectionAttempts,
     send,
