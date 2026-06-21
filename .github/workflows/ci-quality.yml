@@ -247,6 +247,37 @@ jobs:
       - name: Run smoke tests (all platforms)
         run: bash scripts/smoke-test-all.sh
 
+  # ── Multi-layer regression harness ────────────────────────────────────────
+  regression-harness:
+    name: Multi-layer regression harness (backend/frontend/mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: yarn install --frozen-lockfile
+
+      - name: Run regression harness (all layers)
+        run: bash scripts/run-regression-harness.sh
+
   # ── Workflow definitions self-check ──────────────────────────────────────
   workflow-definitions-check:
     name: Validate workflow YAML definitions
@@ -294,6 +325,7 @@ jobs:
       - mobile-typecheck
       - mobile-lint
       - cross-platform-smoke
+      - regression-harness
       - workflow-definitions-check
     runs-on: ubuntu-latest
     if: always()
