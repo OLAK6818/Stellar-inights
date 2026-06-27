@@ -29,17 +29,28 @@ function getCsrfToken(): string | null {
   return null;
 }
 
+function getRetryDelay(response: Response): number {
+  const retryAfter = response.headers.get('Retry-After');
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(seconds * 1000, 10_000);
+    }
+  }
+  return 1000;
+}
+
 /**
- * Base fetch wrapper with CSRF protection
+ * Base fetch wrapper with CSRF protection and 503 retry
  */
 async function apiFetch(url: string, options: ApiOptions = {}): Promise<Response> {
   const { skipCsrf = false, headers = {}, ...restOptions } = options;
-  
+
   const requestHeaders: HeadersInit = {
     'Content-Type': 'application/json',
     ...headers,
   };
-  
+
   // Add CSRF token for state-changing methods
   const method = options.method?.toUpperCase();
   if (!skipCsrf && method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
@@ -49,13 +60,18 @@ async function apiFetch(url: string, options: ApiOptions = {}): Promise<Response
     }
     requestHeaders['X-CSRF-Token'] = csrfToken;
   }
-  
-  const response = await fetch(url, {
-    ...restOptions,
-    method,
-    headers: requestHeaders,
-  });
-  
+
+  const fetchOpts = { ...restOptions, method, headers: requestHeaders };
+
+  let response = await fetch(url, fetchOpts);
+
+  // Retry once on 503 (K8s rolling deployment window)
+  if (response.status === 503) {
+    const delay = getRetryDelay(response);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    response = await fetch(url, fetchOpts);
+  }
+
   // Handle CSRF token errors
   if (response.status === 403) {
     const data = await response.json().catch(() => ({}));
@@ -63,7 +79,7 @@ async function apiFetch(url: string, options: ApiOptions = {}): Promise<Response
       throw new Error('Security validation failed. Please refresh the page and try again.');
     }
   }
-  
+
   return response;
 }
 
