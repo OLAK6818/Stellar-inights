@@ -11,17 +11,29 @@ import {
   Database,
 } from "lucide-react";
 import { useWallet } from "@/components/lib/wallet-context";
+import { HomeStatsTiles } from "@/components/dashboard/HomeStatsTiles";
+import { TopAssetsCard } from "@/components/dashboard/TopAssetsCard";
+import { useTopMovers } from "@/hooks/useTopMovers";
 
 export default function Home() {
   const { isConnected, connectWallet, isConnecting } = useWallet();
   const t = useTranslations("home");
+  const { data: movers, loading: moversLoading, error: moversError } = useTopMovers(5);
 
-  const mockTickers = [
+  const statsTiles = [
     { labelKey: "usdcBrl" as const, value: "0.998", change: "+0.02%" },
     { labelKey: "xlmEur" as const, value: "3.1s", change: "-120ms" },
     { labelKey: "networkTvl" as const, value: "$45.2M", change: "+5.5%" },
     { labelKey: "successRate" as const, value: "99.98%", change: "+0.1%" },
   ];
+
+  const topMoversAssets = movers.map((asset) => ({
+    asset: asset.symbol,
+    volume: asset.volume24h,
+    tvl: asset.volume24h,
+    price: asset.price,
+    change: asset.change24h,
+  }));
 
   return (
     <main className="space-y-24 pb-20">
@@ -68,26 +80,38 @@ export default function Home() {
       </section>
 
       {/* Live Intelligence Strip */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {mockTickers.map((ticker, i) => (
-          <div
-            key={i}
-            className="glass-card p-6 rounded-2xl group hover:border-accent/30 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                {t(`tickers.${ticker.labelKey}`)}
-              </span>
-              <div className="w-2 h-2 rounded-full bg-green-500 glow-success" />
-            </div>
-            <div className="flex items-end gap-3">
-              <span className="text-2xl font-mono font-bold">{ticker.value}</span>
-              <span className="text-xs font-mono text-green-400 mb-1">
-                {ticker.change}
-              </span>
-            </div>
+      <HomeStatsTiles tiles={statsTiles} t={t} />
+
+      <section className="rounded-[2rem] border border-border/50 bg-background/50 p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-accent">
+              {t("topMovers.title")}
+            </p>
+            <h2 className="text-2xl font-semibold tracking-tight">{t("topMovers.heading")}</h2>
           </div>
-        ))}
+          {!moversLoading && !moversError && (
+            <span className="rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+              {t("topMovers.live" )}
+            </span>
+          )}
+        </div>
+
+        {moversLoading ? (
+          <div className="rounded-xl border border-dashed border-border/60 p-8 text-sm text-muted-foreground">
+            {t("topMovers.loading")}
+          </div>
+        ) : moversError ? (
+          <div className="rounded-xl border border-dashed border-border/60 p-8 text-sm text-muted-foreground">
+            {moversError}
+          </div>
+        ) : topMoversAssets.length > 0 ? (
+          <TopAssetsCard assets={topMoversAssets} mode="top-movers" title={t("topMovers.heading")} />
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/60 p-8 text-sm text-muted-foreground">
+            {t("topMovers.empty")}
+          </div>
+        )}
       </section>
 
       {/* Industrial Capabilities */}
