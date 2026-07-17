@@ -38,6 +38,18 @@ export interface SettlementLatencyDataPoint {
   p99_latency_ms: number;
 }
 
+export interface BalanceHistoryDataPoint {
+  timestamp: string;
+  balance_usd: number;
+  asset_code: string;
+  asset_issuer?: string;
+}
+
+export interface WalletBalanceHistoryResponse {
+  address: string;
+  balance_history: BalanceHistoryDataPoint[];
+}
+
 export interface AnalyticsMetrics {
   top_corridors: CorridorAnalytics[];
   liquidity_history: LiquidityDataPoint[];
@@ -147,6 +159,64 @@ export function getMockApiUsageOverview(): ApiUsageOverview {
       { status_code: 500, count: 50 },
       { status_code: 401, count: 30 },
     ],
+  };
+}
+
+export async function fetchWalletBalanceHistory(address: string): Promise<WalletBalanceHistoryResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/api/wallets/${address}/balance-history`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    const isNetworkError = error instanceof TypeError &&
+      (error.message.includes('Failed to fetch') ||
+        error.message.includes('fetch is not defined') ||
+        error.message.includes('Network request failed'));
+
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet balance history:", error instanceof Error ? error : new Error(String(error)));
+    }
+
+    return getMockWalletBalanceHistory(address);
+  }
+}
+
+export function getMockWalletBalanceHistory(address: string): WalletBalanceHistoryResponse {
+  const now = new Date();
+  const lastSevenDays = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() - (6 - i));
+    return date;
+  });
+
+  const assets = [
+    { asset_code: "XLM", asset_issuer: undefined },
+    { asset_code: "USDC", asset_issuer: "GBUQWP3BOUZX34LOCALEXAMPLE" },
+  ];
+
+  const balanceHistory: BalanceHistoryDataPoint[] = lastSevenDays.flatMap((date) =>
+    assets.map((asset) => ({
+      timestamp: date.toISOString(),
+      balance_usd: asset.asset_code === "XLM" 
+        ? 500 + Math.random() * 200 + (date.getTime() - lastSevenDays[0].getTime()) * 0.001
+        : 1200 + Math.random() * 400 + (date.getTime() - lastSevenDays[0].getTime()) * 0.003,
+      asset_code: asset.asset_code,
+      asset_issuer: asset.asset_issuer,
+    }))
+  );
+
+  return {
+    address,
+    balance_history: balanceHistory,
   };
 }
 
