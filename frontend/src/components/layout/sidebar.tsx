@@ -23,6 +23,7 @@ import {
   Share2,
   Shield,
   Gauge,
+  WalletCards,
 } from "lucide-react";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -34,6 +35,7 @@ const navItems = [
   { key: "network", icon: Share2, path: "/network" },
   { key: "analytics", icon: BarChart3, path: "/analytics" },
   { key: "apiUsage", icon: Activity, path: "/analytics/api" },
+  { key: "wallets", icon: WalletCards, path: "/wallet" },
   { key: "trustlines", icon: Users, path: "/trustlines" },
   { key: "networkHealth", icon: Activity, path: "/health" },
   { key: "liquidity", icon: Waves, path: "/liquidity" },
