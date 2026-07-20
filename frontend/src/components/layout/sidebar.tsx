@@ -23,30 +23,98 @@ import {
   Share2,
   Shield,
   Gauge,
+  Wallet,
+  Code2,
+  Medal,
+  Server,
 } from "lucide-react";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
-const navItems = [
-  { key: "home", icon: LayoutDashboard, path: "/" },
-  { key: "terminal", icon: LayoutDashboard, path: "/dashboard" },
-  { key: "corridors", icon: Compass, path: "/corridors" },
-  { key: "network", icon: Share2, path: "/network" },
-  { key: "analytics", icon: BarChart3, path: "/analytics" },
-  { key: "apiUsage", icon: Activity, path: "/analytics/api" },
-  { key: "trustlines", icon: Users, path: "/trustlines" },
-  { key: "networkHealth", icon: Activity, path: "/health" },
-  { key: "liquidity", icon: Waves, path: "/liquidity" },
-  { key: "pools", icon: Droplets, path: "/liquidity-pools" },
-  { key: "sep6", icon: Database, path: "/sep6" },
-  { key: "calculator", icon: Calculator, path: "/calculator" },
-  { key: "apiKeys", icon: Key, path: "/developer/keys" },
-  { key: "quests", icon: Trophy, path: "/quests" },
-  { key: "governance", icon: ScrollText, path: "/governance" },
-  { key: "privacy", icon: Shield, path: "/settings/gdpr" },
-  { key: "alerts", icon: Activity, path: "/alerts" },
-  { key: "performance", icon: Gauge, path: "/performance" },
+type NavItem = {
+  key: string;
+  icon: React.ComponentType<{ className?: string }>;
+  path: string;
+};
+
+type NavGroup = {
+  key: string;
+  items: NavItem[];
+};
+
+/**
+ * Information architecture (pivot IA):
+ * Overview | Assets | Wallets | Soroban | Rankings | Validators | Explorer
+ *
+ * Validators: remaps existing networkHealth (/health) — closest match for
+ * node/network health until a dedicated validators page exists. Path unchanged.
+ *
+ * Renames (labels only; paths stable):
+ * - trustlines → Asset Intelligence
+ * - analytics → Network Metrics (Statistics → Network Metrics)
+ * - soroban → Soroban Activity (Contract List → Soroban Activity)
+ * - wallet → Wallet Insights (Account Lookup → Wallet Insights)
+ * Transaction Explorer → Transaction Analytics: no genuine existing match; skipped.
+ */
+const navGroups: NavGroup[] = [
+  {
+    key: "overview",
+    items: [
+      { key: "home", icon: LayoutDashboard, path: "/" },
+      { key: "terminal", icon: LayoutDashboard, path: "/dashboard" },
+      { key: "corridors", icon: Compass, path: "/corridors" },
+      { key: "network", icon: Share2, path: "/network" },
+      { key: "analytics", icon: BarChart3, path: "/analytics" },
+      { key: "alerts", icon: Activity, path: "/alerts" },
+      { key: "performance", icon: Gauge, path: "/performance" },
+    ],
+  },
+  {
+    key: "assets",
+    items: [
+      { key: "trustlines", icon: Users, path: "/trustlines" },
+      { key: "liquidity", icon: Waves, path: "/liquidity" },
+      { key: "pools", icon: Droplets, path: "/liquidity-pools" },
+      { key: "sep6", icon: Database, path: "/sep6" },
+    ],
+  },
+  {
+    key: "wallets",
+    items: [{ key: "walletInsights", icon: Wallet, path: "/wallet" }],
+  },
+  {
+    key: "soroban",
+    items: [{ key: "soroban", icon: Code2, path: "/soroban" }],
+  },
+  {
+    key: "rankings",
+    items: [{ key: "rankings", icon: Medal, path: "/rankings" }],
+  },
+  {
+    key: "validators",
+    items: [{ key: "networkHealth", icon: Server, path: "/health" }],
+  },
+  {
+    key: "explorer",
+    items: [
+      { key: "calculator", icon: Calculator, path: "/calculator" },
+      { key: "apiUsage", icon: Activity, path: "/analytics/api" },
+      { key: "apiKeys", icon: Key, path: "/developer/keys" },
+      { key: "quests", icon: Trophy, path: "/quests" },
+      { key: "governance", icon: ScrollText, path: "/governance" },
+      { key: "privacy", icon: Shield, path: "/settings/gdpr" },
+    ],
+  },
 ];
+
+function isNavActive(pathname: string, path: string, allPaths: string[]): boolean {
+  if (path === "/") return pathname === "/";
+  // Longest-prefix wins so /analytics/api does not activate /analytics.
+  const matching = allPaths
+    .filter((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)))
+    .sort((a, b) => b.length - a.length);
+  return matching[0] === path;
+}
 
 interface SidebarProps {
   open?: boolean;
@@ -59,6 +127,7 @@ export function Sidebar({ open, onClose }: SidebarProps = {}) {
   const { prefs, setPrefs } = useUserPreferences();
   const collapsed = prefs.sidebarCollapsed;
   const setCollapsed = (val: boolean) => setPrefs({ sidebarCollapsed: val });
+  const allPaths = navGroups.flatMap((group) => group.items.map((item) => item.path));
 
   return (
     <aside
@@ -84,38 +153,56 @@ export function Sidebar({ open, onClose }: SidebarProps = {}) {
 
         {/* Navigation Section */}
         <nav aria-label="Primary navigation" className="flex-1 px-4 py-8 overflow-y-auto">
-          <ul role="list" className="space-y-3 m-0 p-0 list-none">
-            {navItems.map((item) => {
-              const isActive = pathname === item.path;
-              const Icon = item.icon;
-
-              return (
-                <li key={item.path}>
-                  <Link
-                    href={item.path}
-                    aria-current={isActive ? "page" : undefined}
-                    aria-label={t(item.key)}
-                    className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
-                        ? "bg-accent/10 text-accent border border-accent/20"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
-                      }`}
+          <ul role="list" className="space-y-6 m-0 p-0 list-none">
+            {navGroups.map((group) => (
+              <li key={group.key}>
+                {!collapsed && (
+                  <div
+                    id={`nav-group-${group.key}`}
+                    className="px-4 mb-2 text-[10px] font-mono text-muted-foreground/70 uppercase tracking-[0.2em]"
                   >
-                    <Icon
-                      aria-hidden="true"
-                      className={`w-5 h-5 shrink-0 ${isActive ? "text-accent" : "group-hover:text-foreground"}`}
-                    />
-                    {!collapsed && (
-                      <span className="font-bold text-sm uppercase tracking-widest">
-                        {t(item.key)}
-                      </span>
-                    )}
-                    {isActive && !collapsed && (
-                      <div className="ml-auto w-1 h-4 rounded-full bg-accent shadow-[0_0_8px_rgba(99,102,241,0.6)]" aria-hidden="true" />
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
+                    {t(`groups.${group.key}`)}
+                  </div>
+                )}
+                <ul
+                  role="list"
+                  aria-labelledby={collapsed ? undefined : `nav-group-${group.key}`}
+                  className="space-y-1 m-0 p-0 list-none"
+                >
+                  {group.items.map((item) => {
+                    const isActive = isNavActive(pathname, item.path, allPaths);
+                    const Icon = item.icon;
+
+                    return (
+                      <li key={item.path}>
+                        <Link
+                          href={item.path}
+                          aria-current={isActive ? "page" : undefined}
+                          aria-label={t(item.key)}
+                          className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
+                              ? "bg-accent/10 text-accent border border-accent/20"
+                              : "text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
+                            }`}
+                        >
+                          <Icon
+                            aria-hidden="true"
+                            className={`w-5 h-5 shrink-0 ${isActive ? "text-accent" : "group-hover:text-foreground"}`}
+                          />
+                          {!collapsed && (
+                            <span className="font-bold text-sm uppercase tracking-widest">
+                              {t(item.key)}
+                            </span>
+                          )}
+                          {isActive && !collapsed && (
+                            <div className="ml-auto w-1 h-4 rounded-full bg-accent shadow-[0_0_8px_rgba(99,102,241,0.6)]" aria-hidden="true" />
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
           </ul>
         </nav>
 

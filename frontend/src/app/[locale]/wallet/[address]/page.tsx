@@ -1,6 +1,7 @@
 "use client";
 import { logger } from "@/lib/logger";
 import { useEffect, useState, use, Suspense } from "react";
+import { useTranslations } from "next-intl";
 import { getAddressValidationError } from "@/lib/address";
 import { BalanceHistoryChart } from "@/components/charts/BalanceHistoryChart";
 import { AlertCircle } from "lucide-react";
@@ -15,6 +16,7 @@ function WalletPageContent({
 }) {
   const unwrappedParams = use(params);
   const { address } = unwrappedParams;
+  const t = useTranslations("layout.walletInsights");
   const [balanceHistory, setBalanceHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,16 +66,16 @@ function WalletPageContent({
           <AlertCircle className="w-8 h-8 text-rose-500" />
         </div>
         <h2 className="text-xl font-bold text-white mb-2">
-          Error Loading Wallet
+          Error Loading Wallet Insights
         </h2>
         <p className="text-slate-400 mb-6 max-w-md">
           {error}
         </p>
         <Link
-          href="/"
+          href="/wallet"
           className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium text-sm"
         >
-          Return to Dashboard
+          Back to Wallet Insights
         </Link>
       </div>
     );
@@ -84,13 +86,13 @@ function WalletPageContent({
       {/* Breadcrumb / Back */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <BackButton
-          fallbackHref="/"
-          label="Dashboard"
+          fallbackHref="/wallet"
+          label={t("breadcrumb")}
           className="hover:text-white transition-colors flex items-center gap-1 group"
         />
         <span className="text-slate-600">/</span>
         <span className="text-slate-200 truncate max-w-[200px]">
-          Wallet {address.slice(0, 8)}...{address.slice(-8)}
+          {address.slice(0, 8)}...{address.slice(-8)}
         </span>
       </div>
 
