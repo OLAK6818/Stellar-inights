@@ -27,7 +27,6 @@ import {
   Code2,
   Medal,
   Server,
-  Award,
 } from "lucide-react";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -106,26 +105,6 @@ const navGroups: NavGroup[] = [
       { key: "privacy", icon: Shield, path: "/settings/gdpr" },
     ],
   },
-const navItems = [
-  { key: "home", icon: LayoutDashboard, path: "/" },
-  { key: "terminal", icon: LayoutDashboard, path: "/dashboard" },
-  { key: "corridors", icon: Compass, path: "/corridors" },
-  { key: "network", icon: Share2, path: "/network" },
-  { key: "analytics", icon: BarChart3, path: "/analytics" },
-  { key: "apiUsage", icon: Activity, path: "/analytics/api" },
-  { key: "trustlines", icon: Users, path: "/trustlines" },
-  { key: "rankings", icon: Award, path: "/rankings" },
-  { key: "networkHealth", icon: Activity, path: "/health" },
-  { key: "liquidity", icon: Waves, path: "/liquidity" },
-  { key: "pools", icon: Droplets, path: "/liquidity-pools" },
-  { key: "sep6", icon: Database, path: "/sep6" },
-  { key: "calculator", icon: Calculator, path: "/calculator" },
-  { key: "apiKeys", icon: Key, path: "/developer/keys" },
-  { key: "quests", icon: Trophy, path: "/quests" },
-  { key: "governance", icon: ScrollText, path: "/governance" },
-  { key: "privacy", icon: Shield, path: "/settings/gdpr" },
-  { key: "alerts", icon: Activity, path: "/alerts" },
-  { key: "performance", icon: Gauge, path: "/performance" },
 ];
 
 function isNavActive(pathname: string, path: string, allPaths: string[]): boolean {
