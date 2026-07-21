@@ -49,6 +49,15 @@ export default function SorobanPage() {
   useEffect(() => {
     void load();
   }, []);
+import React from "react";
+import { Code2 } from "lucide-react";
+import { useTranslations } from "next-intl";
+
+/**
+ * Scaffold for the Soroban dashboard (#165). Panels land in #166–#169.
+ */
+export default function SorobanPage() {
+  const t = useTranslations("layout.sidebar");
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -91,6 +100,18 @@ export default function SorobanPage() {
           notice={deployments?.notice}
           loading={loading}
         />
+            {t("soroban")}
+          </h1>
+          <p className="text-muted-foreground text-sm max-w-xl mt-3">
+            Active contracts, call volume, gas usage, and deployments will appear here.
+          </p>
+        </div>
+      </div>
+
+      <div className="glass rounded-2xl border border-dashed border-border/60 p-10 text-center">
+        <p className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
+          Panels coming soon
+        </p>
       </div>
     </div>
   );
