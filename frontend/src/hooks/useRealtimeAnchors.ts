@@ -1,12 +1,19 @@
-import { useEffect, useState, useCallback } from "react";
-import { useWebSocket, WsMessage } from "./useWebSocket";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useWebSocket } from "./useWebSocket";
 import { logger } from "@/lib/logger";
+import { config } from "@/config";
+import {
+  WsAnchorUpdate,
+  WsSubscriptionConfirm,
+  WsPing,
+  WsUnknownMessage,
+  isAnchorUpdate,
+  isSubscriptionConfirm,
+  isPing,
+} from "@/lib/websocket-message-parser";
 
-export interface AnchorUpdate {
-  anchor_id: string;
-  name: string;
-  reliability_score: number;
-  status: string;
+export interface AnchorUpdate extends WsAnchorUpdate {
+  // Fully inherits from WsAnchorUpdate
 }
 
 export interface UseRealtimeAnchorsOptions {
@@ -33,33 +40,25 @@ export function useRealtimeAnchors(
     new Map(),
   );
 
+  // Track current subscriptions for resubscription on reconnect
+  const subscribedIdsRef = useRef<string[]>([]);
+
   // Get WebSocket URL from environment or default
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws";
+  const wsUrl = config.wsUrl;
 
   const handleMessage = useCallback(
-    (message: WsMessage) => {
-      switch (message.type) {
-        case "anchor_update":
-          const anchorUpdate = message as AnchorUpdate;
-          setAnchorUpdates((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(anchorUpdate.anchor_id, anchorUpdate);
-            return newMap;
-          });
-          onAnchorUpdate?.(anchorUpdate);
-          break;
-
-        case "subscription_confirm":
-          logger.debug("Anchor subscription confirmed:", message);
-          break;
-
-        case "ping":
-          // Handle ping/pong automatically
-          break;
-
-        default:
-          // Ignore other message types
-          break;
+    (message: WsAnchorUpdate | WsSubscriptionConfirm | WsPing | WsUnknownMessage) => {
+      if (isAnchorUpdate(message)) {
+        setAnchorUpdates((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(message.anchor_id, message);
+          return newMap;
+        });
+        onAnchorUpdate?.(message);
+      } else if (isSubscriptionConfirm(message)) {
+        logger.debug("Anchor subscription confirmed for channels:", message.channels);
+      } else if (isPing(message)) {
+        // Ignore pings silently
       }
     },
     [onAnchorUpdate],
@@ -76,9 +75,12 @@ export function useRealtimeAnchors(
     onMessage: handleMessage,
     onOpen: () => {
       logger.debug("Connected to anchor WebSocket");
-      // Re-subscribe to anchors on reconnection
-      if (anchorIds.length > 0) {
-        subscribeToAnchors(anchorIds);
+      // Re-subscribe to all previously subscribed anchors on reconnection
+      const ids = subscribedIdsRef.current;
+      if (ids.length > 0) {
+        const channels = ids.map((id) => `anchor:${id}`);
+        subscribe(channels);
+        logger.debug("Resubscribed to anchors after reconnect:", ids);
       }
     },
     onClose: () => {
@@ -91,6 +93,8 @@ export function useRealtimeAnchors(
 
   const subscribeToAnchors = useCallback(
     (ids: string[]) => {
+      // Track subscribed IDs for resubscription
+      subscribedIdsRef.current = ids;
       const channels = ids.map((id) => `anchor:${id}`);
       subscribe(channels);
     },
@@ -99,6 +103,10 @@ export function useRealtimeAnchors(
 
   const unsubscribeFromAnchors = useCallback(
     (ids: string[]) => {
+      // Remove unsubscribed IDs from tracking
+      subscribedIdsRef.current = subscribedIdsRef.current.filter(
+        (id) => !ids.includes(id),
+      );
       const channels = ids.map((id) => `anchor:${id}`);
       unsubscribe(channels);
     },

@@ -2,6 +2,14 @@
  * WebSocket client for real-time updates from the Stellar Insights backend
  */
 import { logger } from "@/lib/logger";
+import { config } from "@/config";
+import {
+  WsMessage,
+  parseWebSocketMessage,
+  isPing,
+  isPong,
+  isConnected,
+} from "@/lib/websocket-message-parser";
 
 export type WsMessageType =
   | "snapshot_update"
@@ -10,61 +18,24 @@ export type WsMessageType =
   | "ping"
   | "pong"
   | "connected"
-  | "error";
+  | "error"
+  | "health_alert"
+  | "new_payment"
+  | "subscription_confirm";
 
-export interface WsSnapshotUpdate {
-  type: "snapshot_update";
-  snapshot_id: string;
-  epoch: number;
-  timestamp: string;
-  hash: string;
-}
-
-export interface WsCorridorUpdate {
-  type: "corridor_update";
-  corridor_id: string;
-  corridor_key: string;
-  success_rate: number;
-  volume_usd: number;
-  total_transactions: number;
-}
-
-export interface WsAnchorUpdate {
-  type: "anchor_update";
-  anchor_id: string;
-  name: string;
-  reliability_score: number;
-  status: string;
-}
-
-export interface WsPing {
-  type: "ping";
-  timestamp: number;
-}
-
-export interface WsPong {
-  type: "pong";
-  timestamp: number;
-}
-
-export interface WsConnected {
-  type: "connected";
-  connection_id: string;
-}
-
-export interface WsError {
-  type: "error";
-  message: string;
-}
-
-export type WsMessage =
-  | WsSnapshotUpdate
-  | WsCorridorUpdate
-  | WsAnchorUpdate
-  | WsPing
-  | WsPong
-  | WsConnected
-  | WsError;
+// Re-export types from parser
+export type {
+  WsSnapshotUpdate,
+  WsCorridorUpdate,
+  WsAnchorUpdate,
+  WsPing,
+  WsPong,
+  WsConnected,
+  WsError,
+  WsHealthAlert,
+  WsNewPayment,
+  WsSubscriptionConfirm,
+} from "@/lib/websocket-message-parser";
 
 export type WsEventHandler = (message: WsMessage) => void;
 
@@ -99,15 +70,7 @@ export class StellarInsightsWebSocket {
    * Get the default WebSocket URL based on the current environment
    */
   private getDefaultWsUrl(): string {
-    if (typeof window === "undefined") {
-      return "ws://localhost:8080/ws";
-    }
-
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname;
-    const port = process.env.NEXT_PUBLIC_WS_PORT || "8080";
-
-    return `${protocol}//${host}:${port}/ws`;
+    return config.wsUrl;
   }
 
   /**
@@ -267,16 +230,22 @@ export class StellarInsightsWebSocket {
    */
   private handleMessage(event: MessageEvent): void {
     try {
-      const message = JSON.parse(event.data) as WsMessage;
+      const parsedData = JSON.parse(event.data);
+      const message = parseWebSocketMessage(parsedData);
+
+      // Ignore malformed messages
+      if (!message) {
+        return;
+      }
 
       // Store connection ID when connected
-      if (message.type === "connected") {
+      if (isConnected(message)) {
         this.connectionId = message.connection_id;
       }
 
       // Automatically respond to pings with pongs
-      if (message.type === "ping") {
-        const pong: WsPong = {
+      if (isPing(message)) {
+        const pong: { type: "pong"; timestamp: number } = {
           type: "pong",
           timestamp: message.timestamp,
         };
@@ -284,7 +253,9 @@ export class StellarInsightsWebSocket {
       }
 
       // Notify all registered listeners
-      const handlers = this.listeners.get(message.type);
+      const handlers = this.listeners.get(
+        message.type as WsMessageType
+      );
       if (handlers) {
         handlers.forEach((handler) => {
           try {

@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 // Types for contract transaction submission
 export interface ContractTransaction {
@@ -68,7 +69,7 @@ export class ContractSubmissionService {
       // Validate input
       const validatedRequest = ContractTransactionSchema.parse(request);
 
-      console.log(`[ContractSubmission] Starting submission for contract ${validatedRequest.contractId}`);
+      logger.info('ContractSubmission: starting submission', { contractId: validatedRequest.contractId });
 
       // Step 1: Build the transaction
       const transaction = this.buildTransaction(validatedRequest);
@@ -88,7 +89,7 @@ export class ContractSubmissionService {
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error(`[ContractSubmission] Submission failed: ${errorMessage}`);
+      logger.error('ContractSubmission: submission failed', error as Error, { errorMessage });
 
       return {
         success: false,
@@ -107,7 +108,7 @@ export class ContractSubmissionService {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        console.log(`[ContractSubmission] Simulating transaction (attempt ${attempt + 1}/${maxAttempts})`);
+        logger.debug('ContractSubmission: simulating transaction', { attempt: attempt + 1, maxAttempts });
 
         const response = await fetch(`${this.backendUrl}/api/v1/contracts/simulate`, {
           method: "POST",
@@ -135,17 +136,18 @@ export class ContractSubmissionService {
         transaction.simulatedEnvelope = simulated.transactionData;
         transaction.submissionStatus = "signing";
 
-        console.log("[ContractSubmission] Simulation successful");
+        logger.debug('ContractSubmission: simulation successful');
         return transaction;
       } catch (error) {
         lastError = error as Error;
-        console.warn(
-          `[ContractSubmission] Simulation attempt ${attempt + 1} failed: ${lastError.message}`
-        );
+        logger.warn('ContractSubmission: simulation attempt failed', {
+          attempt: attempt + 1,
+          error: lastError.message,
+        });
 
         if (attempt < maxAttempts - 1) {
           const delayMs = this.retryDelayMs * Math.pow(2, attempt);
-          console.log(`[ContractSubmission] Retrying in ${delayMs}ms...`);
+          logger.debug('ContractSubmission: retrying simulation', { delayMs });
           await this.delay(delayMs);
         }
       }
@@ -163,7 +165,7 @@ export class ContractSubmissionService {
         throw new Error("No simulated envelope available");
       }
 
-      console.log("[ContractSubmission] Sending to backend for signing");
+      logger.info('ContractSubmission: sending to backend for signing');
 
       const response = await fetch(`${this.backendUrl}/api/v1/contracts/submit`, {
         method: "POST",
@@ -186,7 +188,7 @@ export class ContractSubmissionService {
         throw new Error("Backend did not return transaction hash");
       }
 
-      console.log(`[ContractSubmission] Backend submission successful: ${result.hash}`);
+      logger.info('ContractSubmission: backend submission successful', { hash: result.hash });
 
       return {
         success: true,
@@ -195,7 +197,7 @@ export class ContractSubmissionService {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown backend error";
-      console.error(`[ContractSubmission] Backend error: ${message}`);
+      logger.error('ContractSubmission: backend error', error as Error, { message });
 
       return {
         success: false,
@@ -234,7 +236,7 @@ export class ContractSubmissionService {
         const result = await response.json();
 
         if (result.status === "success") {
-          console.log(`[ContractSubmission] Transaction confirmed in ledger ${result.ledger}`);
+          logger.info('ContractSubmission: transaction confirmed', { transactionHash, ledger: result.ledger });
           return {
             success: true,
             transactionHash,
@@ -251,7 +253,7 @@ export class ContractSubmissionService {
         await this.delay(pollIntervalMs);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        console.error(`[ContractSubmission] Confirmation polling error: ${message}`);
+        logger.error('ContractSubmission: confirmation polling error', error as Error, { message });
 
         // Timeout errors are retryable
         if (Date.now() - startTime >= maxWaitMs) {

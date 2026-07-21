@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { logger } from '@/lib/logger';
 import { Users, Send, Trash2, Copy } from 'lucide-react';
 
 interface CollaborativeUser {
@@ -18,6 +19,7 @@ interface CollaborativeMessage {
   content: string;
   timestamp: Date;
   userColor: string;
+  version?: number;
 }
 
 interface RealtimeCollaborationProps {
@@ -46,8 +48,10 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const stateVersionRef = useRef<number>(0);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -79,9 +83,15 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           switch (data.type) {
-            case 'message':
+            case 'message': {
+              const serverVersion = data.version ?? 0;
+              if (serverVersion > 0 && serverVersion <= stateVersionRef.current) {
+                break;
+              }
+              stateVersionRef.current = serverVersion;
+
               const newMessage: CollaborativeMessage = {
                 id: data.id,
                 userId: data.userId,
@@ -89,6 +99,7 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
                 content: data.content,
                 timestamp: new Date(data.timestamp),
                 userColor: data.userColor,
+                version: serverVersion,
               };
               setMessages((prev) => {
                 const updated = [...prev, newMessage];
@@ -96,8 +107,17 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
               });
               onMessageReceived?.(newMessage);
               break;
+            }
 
-            case 'user_joined':
+            case 'conflict': {
+              setConflictMessage(
+                data.message ?? 'Your change conflicted with another user\'s submission. Please retry.',
+              );
+              setTimeout(() => setConflictMessage(null), 5000);
+              break;
+            }
+
+            case 'user_joined': {
               const joinedUser: CollaborativeUser = {
                 id: data.userId,
                 name: data.userName,
@@ -108,6 +128,7 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
               setActiveUsers((prev) => [...prev, joinedUser]);
               onUserJoined?.(joinedUser);
               break;
+            }
 
             case 'user_left':
               setActiveUsers((prev) => prev.filter((u) => u.id !== data.userId));
@@ -125,7 +146,7 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
               break;
           }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          logger.error('Failed to parse WebSocket message', error);
         }
       };
 
@@ -139,7 +160,7 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
         setIsConnected(false);
       };
     } catch (error) {
-      console.error('WebSocket connection failed:', error);
+      logger.error('WebSocket connection failed', error);
       setConnectionStatus('disconnected');
     }
   }, [sessionId, userId, userName, onMessageReceived, onUserJoined, onUserLeft, maxMessages]);
@@ -162,6 +183,7 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
       content: inputValue,
       userId,
       userName,
+      version: stateVersionRef.current,
     }));
 
     setInputValue('');
@@ -201,6 +223,13 @@ export const RealtimeCollaboration: React.FC<RealtimeCollaborationProps> = ({
       <div className="flex flex-1 overflow-hidden">
         {/* Messages Area */}
         <div className="flex-1 flex flex-col">
+          {/* Conflict Banner */}
+          {conflictMessage && (
+            <div className="mx-4 mt-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2" role="alert">
+              <span className="font-medium">Conflict:</span> {conflictMessage}
+            </div>
+          )}
+
           {/* Messages List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 ? (
