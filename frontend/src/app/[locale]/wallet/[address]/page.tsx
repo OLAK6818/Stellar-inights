@@ -4,10 +4,19 @@ import { useEffect, useState, use, Suspense } from "react";
 import { useTranslations } from "next-intl";
 import { getAddressValidationError } from "@/lib/address";
 import { BalanceHistoryChart } from "@/components/charts/BalanceHistoryChart";
+import { ActivityCalendarHeatmap } from "@/components/charts/ActivityCalendarHeatmap";
+import { LargestTransfersList } from "@/components/charts/LargestTransfersList";
 import { AlertCircle } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { BackButton } from "@/components/ui/BackButton";
-import { fetchWalletBalanceHistory } from "@/lib/analytics-api";
+import {
+  fetchWalletBalanceHistory,
+  fetchWalletActivityCalendar,
+  fetchWalletLargestTransfers,
+  ActivityDay,
+  BalanceHistoryDataPoint,
+  LargestTransfer,
+} from "@/lib/analytics-api";
 
 function WalletPageContent({
   params,
@@ -17,7 +26,9 @@ function WalletPageContent({
   const unwrappedParams = use(params);
   const { address } = unwrappedParams;
   const t = useTranslations("layout.walletInsights");
-  const [balanceHistory, setBalanceHistory] = useState<any[]>([]);
+  const [balanceHistory, setBalanceHistory] = useState<BalanceHistoryDataPoint[]>([]);
+  const [activity, setActivity] = useState<ActivityDay[]>([]);
+  const [largestTransfers, setLargestTransfers] = useState<LargestTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,11 +45,17 @@ function WalletPageContent({
 
       try {
         setLoading(true);
-        const result = await fetchWalletBalanceHistory(address);
-        setBalanceHistory(result.balance_history);
+        const [balanceResult, activityResult, transfersResult] = await Promise.all([
+          fetchWalletBalanceHistory(address),
+          fetchWalletActivityCalendar(address),
+          fetchWalletLargestTransfers(address),
+        ]);
+        setBalanceHistory(balanceResult.balance_history);
+        setActivity(activityResult.activity);
+        setLargestTransfers(transfersResult.transfers);
         setError(null);
       } catch (err) {
-        logger.error("Failed to fetch wallet balance history:", err);
+        logger.error("Failed to fetch wallet dashboard data:", err);
         setError("Failed to load wallet data. Please try again later.");
       } finally {
         setLoading(false);
@@ -51,9 +68,11 @@ function WalletPageContent({
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="animate-pulse">
-          <div className="h-4 w-32 bg-slate-800 rounded mb-6"></div>
+        <div className="animate-pulse space-y-8">
+          <div className="h-4 w-32 bg-slate-800 rounded"></div>
           <div className="h-[500px] bg-slate-800 rounded-xl"></div>
+          <div className="h-[280px] bg-slate-800 rounded-xl"></div>
+          <div className="h-[280px] bg-slate-800 rounded-xl"></div>
         </div>
       </div>
     );
@@ -98,6 +117,12 @@ function WalletPageContent({
 
       {/* Balance History Chart */}
       <BalanceHistoryChart data={balanceHistory} address={address} />
+
+      {/* Activity Calendar */}
+      <ActivityCalendarHeatmap data={activity} address={address} />
+
+      {/* Largest Transfers */}
+      <LargestTransfersList transfers={largestTransfers} address={address} />
     </div>
   );
 }
