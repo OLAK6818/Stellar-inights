@@ -67,8 +67,8 @@ Some pages require fetching external data for prerendering. There are two scenar
 **Example**: Your blog page might need to fetch the list of blog posts from a CMS (content management system).
 
 ```jsx
-// TODO: Need to fetch `posts` (by calling some API endpoint)
-//       before this page can be prerendered.
+// Fetch `posts` from your API or database before this page can be prerendered.
+// Replace the fetch call below with your actual data source.
 export default function Blog({ posts }) {
   return (
     <ul>
