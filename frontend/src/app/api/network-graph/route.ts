@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
+import { config } from '@/config';
 import {
   NetworkGraphData,
   GraphNode,
@@ -13,7 +14,7 @@ import {
  */
 export async function GET(): Promise<NextResponse<NetworkGraphData>> {
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+    const backendUrl = config.backendUrl;
 
     // Fetch anchors and corridors from backend
     const [anchorsRes, corridorsRes] = await Promise.all([

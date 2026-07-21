@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { logger } from '@/lib/logger';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ReactQueryLogger } from '@/lib/react-query/logger';
 import { ReactQueryProvider as CustomReactQueryProvider } from '@/lib/react-query/provider';
@@ -35,13 +36,13 @@ function StateDevTools() {
       (window as any).__stateDevtools = {
         // Store debugging
         store,
-        logState: () => console.log('Store State:', store.getState()),
+        logState: () => logger.debug('Store State', { state: store.getState() }),
         resetState: () => store.resetState(),
 
         // Query debugging
         logQueries: () => {
           const cache = queryClient.getQueryCache();
-          console.log('Query Cache:', cache.getAll());
+          logger.debug('Query Cache', { queries: cache.getAll() });
         },
         invalidateAll: () => {
           queryClient.invalidateQueries();
@@ -84,7 +85,10 @@ export function useDebugTools() {
         if (debugTools?.getPerformance) {
           const perf = debugTools.getPerformance();
           if (perf.staleQueries > 0) {
-            console.warn(`Performance: ${perf.staleQueries} stale queries, average stale time: ${perf.averageStaleTime}ms`);
+            logger.warn('Performance: stale queries detected', {
+              staleQueries: perf.staleQueries,
+              averageStaleTimeMs: perf.averageStaleTime,
+            });
           }
         }
       }, 30000);

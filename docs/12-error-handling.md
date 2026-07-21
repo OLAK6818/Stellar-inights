@@ -11,8 +11,9 @@ When there is a runtime error during the development phase of your Next.js appli
 
 Here is an example of an overlay:
 
-{/* TODO UPDATE SCREENSHOT */}
 ![Example of an overlay when in development mode](https://assets.vercel.com/image/upload/v1645118290/docs-assets/static/docs/error-handling/overlay.png)
+
+The overlay displays the error message, a stack trace, and a direct link to the source file. Fix the error and the overlay dismisses automatically — no manual refresh needed.
 
 ## Handling Server Errors
 

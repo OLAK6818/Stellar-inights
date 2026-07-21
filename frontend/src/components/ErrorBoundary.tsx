@@ -34,8 +34,6 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     logger.error("ErrorBoundary caught an error:", error)
     this.setState({ error, errorInfo })
-    
-    // Call optional error callback
     this.props.onError?.(error, errorInfo)
   }
 
@@ -48,11 +46,15 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback
 
       return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div
+          className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4"
+          role="alert"
+          aria-live="assertive"
+        >
           <div className="max-w-2xl w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 p-8">
             <div className="flex items-center gap-4 mb-6">
-              <div className="shrink-0">
-                <AlertTriangle className="w-12 h-12 text-rose-500" />
+              <div className="shrink-0" aria-hidden="true">
+                <AlertTriangle className="w-12 h-12 text-rose-500" aria-hidden="true" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -88,16 +90,16 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={this.handleReset}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4" aria-hidden="true" />
                 Try Again
               </button>
               <Link
                 href="/"
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors font-medium"
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
               >
-                <Home className="w-4 h-4" />
+                <Home className="w-4 h-4" aria-hidden="true" />
                 Go Home
               </Link>
             </div>

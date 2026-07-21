@@ -49,6 +49,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // Check if wallet is already connected and authenticated on mount
   useEffect(() => {
     const checkWalletConnection = async () => {
+      // SEC-001: Ensure we are in a secure environment before handling tokens
+      if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        logger.error('Security violation: Authentication attempted on non-secure connection');
+        return;
+      }
+
       try {
         const savedAddress = localStorage.getItem(STORAGE_KEYS.ADDRESS)
         const savedToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)

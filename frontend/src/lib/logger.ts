@@ -5,8 +5,9 @@
  * - Environment-aware logging (development vs production)
  * - Structured logging with metadata
  * - Error tracking integration with Sentry
- * - Sensitive data redaction
+ * - Comprehensive sensitive data redaction
  * - Type-safe logging methods
+ * - Production-safe debug logging with redaction
  * 
  * Usage:
  * ```typescript
@@ -21,6 +22,9 @@
 const isDevelopment = process.env.NODE_ENV === 'development';
 const isTest = process.env.NODE_ENV === 'test';
 
+// Enable production logging for debug info if explicitly enabled
+const enableProductionLogging = process.env.NEXT_PUBLIC_ENABLE_PROD_LOGS === 'true';
+
 // Disable all logging in test environment unless explicitly enabled
 const isLoggingEnabled = !isTest || process.env.ENABLE_TEST_LOGS === 'true';
 
@@ -33,14 +37,34 @@ interface LogMetadata {
  */
 function redactSensitiveData(data: unknown): unknown {
   if (typeof data === 'string') {
-    // Redact Stellar addresses (56 chars starting with G)
-    data = data.replace(/G[A-Z0-9]{55}/g, 'G****[REDACTED]');
+    let result = data;
     
-    // Redact potential API keys
-    data = data.replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[REDACTED_KEY]');
+    // Redact Stellar addresses (56 chars starting with G)
+    result = result.replace(/G[A-Z0-9]{55}/g, 'G****[REDACTED]');
+    
+    // Redact Stellar secret keys (56 chars starting with S)
+    result = result.replace(/S[A-Z0-9]{55}/g, 'S****[REDACTED_SECRET]');
+    
+    // Redact JWT tokens
+    result = result.replace(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/g, '[REDACTED_JWT]');
+    
+    // Redact potential API keys (32+ chars)
+    result = result.replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[REDACTED_KEY]');
     
     // Redact email addresses
-    data = data.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '****@[REDACTED]');
+    result = result.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '****@[REDACTED]');
+    
+    // Redact phone numbers
+    result = result.replace(/(\+\d{1,3})\d{7,}/g, '$1****[REDACTED]');
+    
+    // Redact credit card numbers (basic pattern)
+    result = result.replace(/\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, '****-****-****-[REDACTED]');
+    
+    return result;
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map(item => redactSensitiveData(item));
   }
   
   if (typeof data === 'object' && data !== null) {
@@ -48,7 +72,7 @@ function redactSensitiveData(data: unknown): unknown {
     
     for (const [key, value] of Object.entries(data)) {
       // Redact sensitive field names
-      if (/password|secret|token|key|auth|credential/i.test(key)) {
+      if (/password|secret|token|key|auth|credential|private|seed|mnemonic|jwt|bearer|signature/i.test(key)) {
         redacted[key] = '[REDACTED]';
       } else {
         redacted[key] = redactSensitiveData(value);
@@ -169,11 +193,15 @@ async function sendErrorToBackend(error: Error, metadata?: LogMetadata): Promise
  */
 export const logger = {
   /**
-   * Debug-level logging (only in development)
+   * Debug-level logging (development only, or production if enabled)
    * Use for detailed debugging information
    */
   debug: (message: string, metadata?: LogMetadata): void => {
-    if (!isLoggingEnabled || !isDevelopment) {
+    if (!isLoggingEnabled) {
+      return;
+    }
+    
+    if (!isDevelopment && !enableProductionLogging) {
       return;
     }
     
@@ -187,11 +215,15 @@ export const logger = {
   },
 
   /**
-   * Info-level logging (only in development)
+   * Info-level logging (development only, or production if enabled)
    * Use for general informational messages
    */
   info: (message: string, metadata?: LogMetadata): void => {
-    if (!isLoggingEnabled || !isDevelopment) {
+    if (!isLoggingEnabled) {
+      return;
+    }
+    
+    if (!isDevelopment && !enableProductionLogging) {
       return;
     }
     
@@ -205,11 +237,15 @@ export const logger = {
   },
 
   /**
-   * Warning-level logging (only in development)
+   * Warning-level logging (development only, or production if enabled)
    * Use for potentially problematic situations
    */
   warn: (message: string, metadata?: LogMetadata): void => {
-    if (!isLoggingEnabled || !isDevelopment) {
+    if (!isLoggingEnabled) {
+      return;
+    }
+    
+    if (!isDevelopment && !enableProductionLogging) {
       return;
     }
     

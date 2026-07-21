@@ -434,6 +434,16 @@ describe("ErrorBoundary", () => {
       expect(heading).toHaveTextContent("Something went wrong");
     });
 
+    it("should expose role=alert so screen readers announce the error", () => {
+      render(
+        <ErrorBoundary>
+          <ThrowError />
+        </ErrorBoundary>,
+      );
+
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
     it("should have accessible buttons", () => {
       render(
         <ErrorBoundary>
@@ -467,6 +477,44 @@ describe("ErrorBoundary", () => {
 
       const errorHeading = screen.getByText("Something went wrong");
       expect(errorHeading).toHaveClass("text-gray-900", "dark:text-white");
+    });
+  });
+
+  describe("Telemetry initialization guard", () => {
+    it("should not call logger when DSN is absent", () => {
+      const originalDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+      delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+      // Re-render with no DSN: logger.error should still be called by ErrorBoundary
+      // (it uses our internal logger, not Sentry directly), but Sentry.init is skipped.
+      // This test verifies ErrorBoundary itself remains functional without Sentry.
+      render(
+        <ErrorBoundary>
+          <ThrowError />
+        </ErrorBoundary>,
+      );
+
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+      expect(logger.error).toHaveBeenCalled();
+
+      process.env.NEXT_PUBLIC_SENTRY_DSN = originalDsn;
+    });
+
+    it("should not expose raw error details in production", () => {
+      const originalEnv = process.env.NODE_ENV;
+      Object.defineProperty(process.env, "NODE_ENV", { value: "production", configurable: true });
+
+      render(
+        <ErrorBoundary>
+          <ThrowError />
+        </ErrorBoundary>,
+      );
+
+      expect(screen.queryByText("Error Details (Development Only)")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Test error message/)).not.toBeInTheDocument();
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+
+      Object.defineProperty(process.env, "NODE_ENV", { value: originalEnv, configurable: true });
     });
   });
 

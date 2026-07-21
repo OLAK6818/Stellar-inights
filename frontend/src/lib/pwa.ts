@@ -1,8 +1,8 @@
 // PWA utilities for offline detection and SW status
 
-let isOnline = 'onLine' in navigator ? navigator.onLine : true;
+let isOnline = typeof window !== 'undefined' && 'onLine' in navigator ? navigator.onLine : true;
 
-export function addOfflineListener(callback: (online: boolean) => void) {
+export function addOfflineListener(callback: (online: boolean) => void): void {
   if (typeof window === 'undefined') return;
 
   window.addEventListener('online', () => {
@@ -20,17 +20,13 @@ export function isOffline(): boolean {
 }
 
 export async function getSWStatus(): Promise<'supported' | 'unsupported' | 'no-permission' | 'registered'> {
-  if (!('serviceWorker' in navigator)) {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
     return 'unsupported';
-  }
-
-  if (!('permissions' in navigator)) {
-    return 'no-permission';
   }
 
   try {
     const registration = await navigator.serviceWorker.ready;
-    return registration.active ? 'registered' : 'registered';
+    return registration.active ? 'registered' : 'supported';
   } catch {
     return 'no-permission';
   }

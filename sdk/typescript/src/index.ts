@@ -25,6 +25,43 @@ import {
   EnvironmentDetector,
 } from "./sdk-init.js";
 import { ApiClient, BatchApiClient, ApiClientError } from "./api-client.js";
+import { WebSocketManager } from "./websocket-manager.js";
+
+// ─── Network Configuration ──────────────────────────────────────────────────
+
+export interface NetworkConfig {
+  rpcUrl: string;
+  horizonUrl: string;
+  networkPassphrase: string;
+  friendbotUrl?: string;
+}
+
+export const NETWORKS: Record<"mainnet" | "testnet", NetworkConfig> = {
+  mainnet: {
+    rpcUrl: "https://soroban-rpc.mainnet.stellar.gateway.fm",
+    horizonUrl: "https://horizon.stellar.org",
+    networkPassphrase: "Public Global Stellar Network ; September 2015",
+  },
+  testnet: {
+    rpcUrl: "https://soroban-testnet.stellar.org",
+    horizonUrl: "https://horizon-testnet.stellar.org",
+    networkPassphrase: "Test SDF Network ; September 2015",
+    friendbotUrl: "https://friendbot.stellar.org",
+  },
+};
+
+export function createClient(
+  network: "mainnet" | "testnet",
+  config: Omit<StellarInsightsConfig, "baseUrl"> = {},
+): StellarInsights {
+  const networkConfig = NETWORKS[network];
+  return new StellarInsights({
+    ...config,
+    baseUrl: networkConfig.rpcUrl,
+  });
+}
+
+// ─── Main Client ─────────────────────────────────────────────────────────────
 
 export class StellarInsights {
   readonly anchors: AnchorsResource;
@@ -44,10 +81,15 @@ export class StellarInsights {
   readonly apiClient: ApiClient;
 
   private readonly http: HttpClient;
+  private wsManager: WebSocketManager | null = null;
+  private readonly rpcUrl: string;
+  private readonly networkId: string;
 
   constructor(config: StellarInsightsConfig = {}) {
     this.http = new HttpClient(config);
     this.apiClient = new ApiClient(config);
+    this.rpcUrl = (config.baseUrl ?? "https://api.stellarinsights.io").replace(/\/$/, "").replace(/^http/, "ws");
+    this.networkId = config.baseUrl?.includes("testnet") ? "testnet" : "mainnet";
     this.anchors = new AnchorsResource(this.http);
     this.corridors = new CorridorsResource(this.http);
     this.prices = new PricesResource(this.http);
@@ -63,8 +105,23 @@ export class StellarInsights {
     this.governance = new GovernanceResource(this.http);
     this.assetVerification = new AssetVerificationResource(this.http);
   }
+
+  subscribe(handler: (data: unknown) => void): () => void {
+    if (!this.wsManager) {
+      this.wsManager = new WebSocketManager(this.rpcUrl, this.networkId);
+    }
+    return this.wsManager.subscribe(handler);
+  }
+
+  disconnect(): void {
+    if (this.wsManager) {
+      this.wsManager.disconnect();
+      this.wsManager = null;
+    }
+  }
 }
 
+export { WebSocketManager } from "./websocket-manager.js";
 export { StellarInsightsError } from "./http.js";
 export { SDKError } from "./sdk_error.js";
 export { SDKUnitTests } from "./sdk_unit_tests.js";

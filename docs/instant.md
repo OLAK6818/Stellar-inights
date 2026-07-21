@@ -94,7 +94,6 @@ The `@next/playwright` package exports an `instant()` helper that holds back dyn
 import { instant } from '@next/playwright'
 ```
 
-{/* TODO: remove when fixed and from prod-docs-release */}
 
 ## Known issue: shared cookie across projects
 

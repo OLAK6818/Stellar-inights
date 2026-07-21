@@ -98,4 +98,9 @@ mobile/android/app/build/
 # Project specific
 # ============================================
 requirements.md
+# ============================================
+# Issue tracker - local development notes
+# ============================================
+issues.md
+
 AGENTS.md

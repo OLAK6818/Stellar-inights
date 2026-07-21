@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .http import HttpClient, StellarInsightsError
+from .http import HttpClient, StellarInsightsError, RateLimitError
 from .resources import (
     AlertsResource,
     AnchorsResource,
@@ -37,7 +37,7 @@ class StellarInsights:
         api_key: Optional[str] = None,
         access_token: Optional[str] = None,
         base_url: str = "https://api.stellarinsights.io",
-        max_retries: int = 3,
+        max_retries: int = 5,
         retry_delay: float = 0.5,
         timeout: float = 30.0,
     ) -> None:
@@ -74,4 +74,4 @@ class StellarInsights:
         await self.aclose()
 
 
-__all__ = ["StellarInsights", "StellarInsightsError"]
+__all__ = ["StellarInsights", "StellarInsightsError", "RateLimitError"]
