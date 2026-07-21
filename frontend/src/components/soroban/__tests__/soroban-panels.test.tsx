@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NewDeploymentsList } from "../NewDeploymentsList";
 import { TopContractsTable } from "../TopContractsTable";
+import { ContractCallsChart } from "@/components/charts/ContractCallsChart";
 import {
+  fetchSorobanContractCalls,
   fetchSorobanNewDeployments,
   fetchSorobanTopContracts,
 } from "@/lib/soroban-api";
@@ -69,6 +71,33 @@ describe("TopContractsTable", () => {
   });
 });
 
+describe("ContractCallsChart", () => {
+  it("shows empty state when series is missing", () => {
+    render(<ContractCallsChart data={[]} />);
+    expect(screen.getByText("Contract Calls")).toBeInTheDocument();
+    expect(
+      screen.getByText(/No contract-call time series yet/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders summary stats from series data", () => {
+    render(
+      <ContractCallsChart
+        data={[
+          { date: "2026-07-01", count: 100 },
+          { date: "2026-07-02", count: 250 },
+          { date: "2026-07-03", count: 175 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Latest day")).toBeInTheDocument();
+    expect(screen.getByText("Period total")).toBeInTheDocument();
+    expect(screen.getByText("525")).toBeInTheDocument();
+    expect(screen.getByText("250")).toBeInTheDocument();
+  });
+});
+
 describe("soroban-api empty/partial fallbacks", () => {
   beforeEach(() => {
     vi.stubGlobal(
@@ -92,5 +121,38 @@ describe("soroban-api empty/partial fallbacks", () => {
     expect(result.partial).toBe(true);
     expect(result.deployments).toEqual([]);
     expect(result.notice).toMatch(/incomplete|unavailable/i);
+  });
+
+  it("returns empty contract-calls series on network failure", async () => {
+    const result = await fetchSorobanContractCalls();
+    expect(result.points).toEqual([]);
+    expect(result.metric).toBe("events");
+  });
+});
+
+describe("fetchSorobanContractCalls normalization", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("normalizes a bare {date,count} array", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: async () => [
+            { date: "2026-07-02", count: 20 },
+            { date: "2026-07-01", count: 10 },
+          ],
+        }),
+      ),
+    );
+
+    const result = await fetchSorobanContractCalls(7);
+    expect(result.points).toEqual([
+      { date: "2026-07-01", count: 10 },
+      { date: "2026-07-02", count: 20 },
+    ]);
   });
 });
