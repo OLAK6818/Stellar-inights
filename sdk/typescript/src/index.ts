@@ -26,6 +26,42 @@ import {
 } from "./sdk-init.js";
 import { ApiClient, BatchApiClient, ApiClientError } from "./api-client.js";
 
+// ─── Network Configuration ──────────────────────────────────────────────────
+
+export interface NetworkConfig {
+  rpcUrl: string;
+  horizonUrl: string;
+  networkPassphrase: string;
+  friendbotUrl?: string;
+}
+
+export const NETWORKS: Record<"mainnet" | "testnet", NetworkConfig> = {
+  mainnet: {
+    rpcUrl: "https://soroban-rpc.mainnet.stellar.gateway.fm",
+    horizonUrl: "https://horizon.stellar.org",
+    networkPassphrase: "Public Global Stellar Network ; September 2015",
+  },
+  testnet: {
+    rpcUrl: "https://soroban-testnet.stellar.org",
+    horizonUrl: "https://horizon-testnet.stellar.org",
+    networkPassphrase: "Test SDF Network ; September 2015",
+    friendbotUrl: "https://friendbot.stellar.org",
+  },
+};
+
+export function createClient(
+  network: "mainnet" | "testnet",
+  config: Omit<StellarInsightsConfig, "baseUrl"> = {},
+): StellarInsights {
+  const networkConfig = NETWORKS[network];
+  return new StellarInsights({
+    ...config,
+    baseUrl: networkConfig.rpcUrl,
+  });
+}
+
+// ─── Main Client ─────────────────────────────────────────────────────────────
+
 export class StellarInsights {
   readonly anchors: AnchorsResource;
   readonly corridors: CorridorsResource;
