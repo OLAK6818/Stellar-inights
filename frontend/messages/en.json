@@ -32,6 +32,8 @@
       "analytics": "Network Metrics",
       "apiUsage": "API Usage",
       "trustlines": "Asset Intelligence",
+      "trustlines": "Trustlines",
+      "rankings": "Rankings",
       "networkHealth": "Network Health",
       "liquidity": "Liquidity",
       "pools": "Pools",
