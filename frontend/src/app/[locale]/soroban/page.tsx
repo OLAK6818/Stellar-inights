@@ -1,22 +1,44 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Code2, RefreshCw } from "lucide-react";
 import { TopContractsTable } from "@/components/soroban/TopContractsTable";
 import { NewDeploymentsList } from "@/components/soroban/NewDeploymentsList";
 import {
+  fetchSorobanContractCalls,
   fetchSorobanNewDeployments,
   fetchSorobanTopContracts,
+  type SorobanContractCallsResponse,
   type SorobanNewDeploymentsResponse,
   type SorobanTopContractsResponse,
 } from "@/lib/soroban-api";
 import { logger } from "@/lib/logger";
+
+const ContractCallsChart = dynamic(
+  () =>
+    import("@/components/charts/ContractCallsChart").then((m) => ({
+      default: m.ContractCallsChart,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="glass-card rounded-2xl p-6 border border-border/50 h-[420px] animate-pulse">
+        <div className="h-4 w-40 bg-white/5 rounded mb-4" />
+        <div className="h-8 w-64 bg-white/5 rounded mb-8" />
+        <div className="h-[260px] w-full bg-white/5 rounded-xl" />
+      </div>
+    ),
+  },
+);
 
 export default function SorobanPage() {
   const [topContracts, setTopContracts] =
     useState<SorobanTopContractsResponse | null>(null);
   const [deployments, setDeployments] =
     useState<SorobanNewDeploymentsResponse | null>(null);
+  const [contractCalls, setContractCalls] =
+    useState<SorobanContractCallsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -25,12 +47,14 @@ export default function SorobanPage() {
     else setLoading(true);
 
     try {
-      const [contractsData, deploymentsData] = await Promise.all([
+      const [contractsData, deploymentsData, callsData] = await Promise.all([
         fetchSorobanTopContracts(20, "7d"),
         fetchSorobanNewDeployments(20),
+        fetchSorobanContractCalls(30),
       ]);
       setTopContracts(contractsData);
       setDeployments(deploymentsData);
+      setContractCalls(callsData);
     } catch (error) {
       logger.error("Failed to load Soroban dashboard panels:", error);
       setTopContracts({ window: "7d", contracts: [] });
@@ -40,6 +64,7 @@ export default function SorobanPage() {
         notice:
           "New deployments data is unavailable or incomplete until contract deployment/init events are fully ingested.",
       });
+      setContractCalls({ points: [], metric: "events" });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -49,15 +74,6 @@ export default function SorobanPage() {
   useEffect(() => {
     void load();
   }, []);
-import React from "react";
-import { Code2 } from "lucide-react";
-import { useTranslations } from "next-intl";
-
-/**
- * Scaffold for the Soroban dashboard (#165). Panels land in #166–#169.
- */
-export default function SorobanPage() {
-  const t = useTranslations("layout.sidebar");
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -71,7 +87,8 @@ export default function SorobanPage() {
             Soroban Activity
           </h1>
           <p className="text-muted-foreground text-sm max-w-xl mt-3">
-            Top contracts by call volume and recent deployments across the Soroban network.
+            Contract-call volume, top contracts, and recent deployments across the
+            Soroban network.
           </p>
         </div>
         <button
@@ -88,6 +105,11 @@ export default function SorobanPage() {
         </button>
       </div>
 
+      <ContractCallsChart
+        data={contractCalls?.points ?? []}
+        loading={loading}
+      />
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <TopContractsTable
           contracts={topContracts?.contracts ?? []}
@@ -100,18 +122,6 @@ export default function SorobanPage() {
           notice={deployments?.notice}
           loading={loading}
         />
-            {t("soroban")}
-          </h1>
-          <p className="text-muted-foreground text-sm max-w-xl mt-3">
-            Active contracts, call volume, gas usage, and deployments will appear here.
-          </p>
-        </div>
-      </div>
-
-      <div className="glass rounded-2xl border border-dashed border-border/60 p-10 text-center">
-        <p className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
-          Panels coming soon
-        </p>
       </div>
     </div>
   );
