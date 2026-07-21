@@ -1,0 +1,112 @@
+name: Quality Compliance
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ── File & invariant checks (fast, no toolchain needed) ───────────────────
+  compliance-check:
+    name: Quality compliance script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run quality compliance script (fast mode)
+        run: bash scripts/quality-check.sh --fast
+
+  # ── Backend quality assertions ────────────────────────────────────────────
+  backend-quality:
+    name: Backend – logging quality assertions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-quality-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-quality-
+
+      - name: Run logging quality_assertions unit tests
+        working-directory: backend
+        run: cargo test logging::quality_assertions -- --nocapture
+
+  # ── Frontend production logging tests ────────────────────────────────────
+  frontend-quality:
+    name: Frontend – production logging & ErrorBoundary tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run production logging tests
+        run: pnpm vitest run src/lib/__tests__/logger.production.test.ts
+
+      - name: Run ErrorBoundary production tests
+        run: pnpm vitest run src/components/__tests__/ErrorBoundary.production.test.tsx
+
+  # ── Mobile error handling tests ───────────────────────────────────────────
+  mobile-quality:
+    name: Mobile – useErrorHandling tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: mobile/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run useErrorHandling tests
+        run: npx jest src/hooks/__tests__/useErrorHandling.test.ts --passWithNoTests
+
+  # ── Gate: all compliance jobs must pass ──────────────────────────────────
+  quality-gate:
+    name: Quality gate
+    needs:
+      - compliance-check
+      - backend-quality
+      - frontend-quality
+      - mobile-quality
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Evaluate gate
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more quality compliance checks failed."
+            exit 1
+          fi
+          echo "All quality compliance checks passed."

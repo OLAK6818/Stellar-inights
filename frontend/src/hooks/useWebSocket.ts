@@ -1,31 +1,38 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { logger } from "@/lib/logger";
+import {
+  WsMessage as ValidatedWsMessage,
+  parseWebSocketMessage,
+} from "@/lib/websocket-message-parser";
 
 export enum ConnectionState {
   DISCONNECTED = "DISCONNECTED",
   CONNECTING = "CONNECTING",
   CONNECTED = "CONNECTED",
   RECONNECTING = "RECONNECTING",
+  STALE_DATA = "STALE_DATA",
 }
 
-export interface WsMessage {
-  type: string;
-  [key: string]: string | number | boolean | null | undefined | string[] | Record<string, unknown>;
-}
+// For backward compatibility with code that uses the generic type
+export type WsMessage = ValidatedWsMessage | { type: string; [key: string]: unknown };
 
 export interface UseWebSocketOptions {
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
+  staleDataThreshold?: number; // ms without message before marking as stale
   onOpen?: () => void;
   onClose?: () => void;
   onError?: (error: Event) => void;
   onMessage?: (message: WsMessage) => void;
+  onStaleData?: () => void;
 }
 
 export interface UseWebSocketReturn {
   isConnected: boolean;
   isConnecting: boolean;
+  isStaleData: boolean;
   lastMessage: WsMessage | null;
+  lastMessageTime: number | null;
   connectionAttempts: number;
   send: (message: WsMessage) => void;
   subscribe: (channels: string[]) => void;
@@ -40,15 +47,19 @@ export function useWebSocket(
   const {
     reconnectInterval = 3000,
     maxReconnectAttempts = 5,
+    staleDataThreshold = 30000, // 30s default
     onOpen,
     onClose,
     onError,
     onMessage,
+    onStaleData,
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isStaleData, setIsStaleData] = useState(false);
   const [lastMessage, setLastMessage] = useState<WsMessage | null>(null);
+  const [lastMessageTime, setLastMessageTime] = useState<number | null>(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     ConnectionState.DISCONNECTED
@@ -56,6 +67,7 @@ export function useWebSocket(
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const staleDataTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shouldReconnectRef = useRef(true);
   const isConnectingRef = useRef(false);
 
@@ -119,7 +131,14 @@ export function useWebSocket(
 
       ws.onmessage = (event) => {
         try {
-          const message: WsMessage = JSON.parse(event.data);
+          const parsedData = JSON.parse(event.data);
+          const message = parseWebSocketMessage(parsedData);
+
+          // Ignore malformed messages
+          if (!message) {
+            return;
+          }
+
           setLastMessage(message);
           onMessage?.(message);
         } catch (error) {
@@ -226,6 +245,7 @@ export function useWebSocket(
   return {
     isConnected,
     isConnecting,
+    isStaleData,
     lastMessage,
     connectionAttempts,
     send,

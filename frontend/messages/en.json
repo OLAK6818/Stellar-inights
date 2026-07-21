@@ -16,13 +16,24 @@
   "layout": {
     "sidebar": {
       "stellarInsights": "INSIGHTS",
+      "groups": {
+        "overview": "Overview",
+        "assets": "Assets",
+        "wallets": "Wallets",
+        "soroban": "Soroban",
+        "rankings": "Rankings",
+        "validators": "Validators",
+        "explorer": "Explorer"
+      },
       "home": "Home",
       "terminal": "Terminal",
       "corridors": "Corridors",
       "network": "Network",
-      "analytics": "Analytics",
+      "analytics": "Network Metrics",
       "apiUsage": "API Usage",
+      "trustlines": "Asset Intelligence",
       "trustlines": "Trustlines",
+      "rankings": "Rankings",
       "networkHealth": "Network Health",
       "liquidity": "Liquidity",
       "pools": "Pools",
@@ -36,9 +47,23 @@
       "collapse": "Collapse",
       "alerts": "Alerts",
       "performance": "Performance",
+      "walletInsights": "Wallet Insights",
+      "soroban": "Soroban Activity",
+      "rankings": "Rankings",
       "expandSidebar": "Expand Sidebar",
       "collapseSidebar": "Collapse Sidebar",
       "systemNominal": "System Nominal"
+    },
+    "walletInsights": {
+      "title": "Wallet Insights",
+      "subtitle": "Look up any Stellar account for portfolio, balances, and activity.",
+      "eyebrow": "Wallet Insights // Lookup",
+      "addressLabel": "Stellar address",
+      "addressPlaceholder": "G... or M...",
+      "submit": "View Wallet Insights",
+      "connectedShortcut": "View my wallet",
+      "invalidAddress": "Enter a valid Stellar G- or M-address.",
+      "breadcrumb": "Wallet Insights"
     }
   },
   "navbar": {

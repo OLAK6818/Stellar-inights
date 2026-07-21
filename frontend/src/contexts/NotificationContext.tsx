@@ -51,7 +51,7 @@ interface NotificationProviderProps {
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
-  websocketUrl = process.env.NEXT_PUBLIC_WS_URL || "", // Disable WebSocket by default
+  websocketUrl = "", // Disable WebSocket by default; callers pass config.wsUrl when realtime is desired
 }) => {
   const [notifications, setNotifications] = useLocalStorage<BaseNotification[]>(
     "stellar-notifications",

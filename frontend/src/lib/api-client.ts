@@ -1,9 +1,15 @@
 /**
- * API Client with CSRF Protection
- * 
+ * API Client with CSRF Protection and Distributed Tracing
+ *
  * Provides type-safe API methods with automatic CSRF token handling
- * for all state-changing operations.
+ * for all state-changing operations, and trace context injection for
+ * distributed tracing across services.
  */
+
+import {
+  getOrCreateTraceContext,
+  formatTraceparentHeader
+} from './telemetry';
 
 interface ApiOptions extends RequestInit {
   skipCsrf?: boolean;
@@ -42,6 +48,7 @@ function getRetryDelay(response: Response): number {
 
 /**
  * Base fetch wrapper with CSRF protection and 503 retry
+ * Base fetch wrapper with CSRF protection and trace context injection
  */
 async function apiFetch(url: string, options: ApiOptions = {}): Promise<Response> {
   const { skipCsrf = false, headers = {}, ...restOptions } = options;
@@ -50,6 +57,15 @@ async function apiFetch(url: string, options: ApiOptions = {}): Promise<Response
     'Content-Type': 'application/json',
     ...headers,
   };
+
+  // Add trace context for distributed tracing
+  try {
+    const traceContext = getOrCreateTraceContext();
+    const traceparent = formatTraceparentHeader(traceContext);
+    requestHeaders['traceparent'] = traceparent;
+  } catch (e) {
+    console.warn('Failed to inject trace context:', e);
+  }
 
   // Add CSRF token for state-changing methods
   const method = options.method?.toUpperCase();
@@ -155,10 +171,29 @@ export async function apiDelete<T = any>(url: string, options?: ApiOptions): Pro
     ...options,
     method: 'DELETE',
   });
-  
+
   if (!response.ok) {
     throw new Error(`API error: ${response.status} ${response.statusText}`);
   }
-  
+
   return response.json();
+}
+
+/**
+ * Recover from stale cached/offline data by reconciling with the server.
+ *
+ * Wraps the existing `/api/rpc/reconcile` endpoint. Pair this with
+ * `useLocalStorage`'s `isStale` flag and `invalidate()`: when a cached value
+ * is reported stale, call this with the timestamp it was last refreshed and
+ * use the returned updates to refresh local state before invalidating.
+ */
+export async function apiReconcile<T = any>(
+  dataTypes: string[],
+  lastKnownTimestamp?: string,
+  options?: ApiOptions
+): Promise<T> {
+  return apiPost<T>('/api/rpc/reconcile', {
+    data_types: dataTypes,
+    last_known_timestamp: lastKnownTimestamp,
+  }, options);
 }

@@ -147,7 +147,32 @@ export default async function PostPage({ params }) {
 
 Design your data access functions as secure primitives: validate inputs, check authentication and authorization, and constrain return types to only what the caller needs. When Server Functions delegate to a [Data Access Layer](/docs/app/guides/data-security#using-a-data-access-layer-for-mutations), these guarantees live in one place and apply consistently.
 
-{/* TODO: showcase input validation */}
+**Input validation example** — reject bad data before it touches your database:
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+import { z } from 'zod'
+import { db } from '@/lib/db'
+import { auth } from '@/lib/auth'
+
+const CreateUserSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email(),
+})
+
+export async function createUser(data: unknown) {
+  const session = await auth()
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const parsed = CreateUserSchema.safeParse(data)
+  if (!parsed.success) {
+    throw new Error('Invalid input: ' + parsed.error.flatten().fieldErrors)
+  }
+
+  const user = await db.user.create({ data: parsed.data })
+  return { id: user.id, name: user.name }
+}
+```
 
 ### Authentication and authorization
 
