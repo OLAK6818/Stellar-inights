@@ -117,9 +117,7 @@ const AnchorTable: React.FC<AnchorTableProps> = ({ anchors, loading = false }) =
     router.push(`/anchors/${anchorId}`);
   };
 
-  // Helper functions
-  // TODO: Intended for future use
-  const getHealthStatusColor = (status: string) => {
+  // Helper functions\r\n  const getHealthStatusColor = (status: string) => {
     const displayStatus = mapBackendStatus(status);
     switch (displayStatus.toLowerCase()) {
       case "healthy":
@@ -133,7 +131,6 @@ const AnchorTable: React.FC<AnchorTableProps> = ({ anchors, loading = false }) =
     }
   };
 
-  // TODO: Intended for future use
   const getHealthStatusIcon = (status: string) => {
     const displayStatus = mapBackendStatus(status);
     switch (displayStatus.toLowerCase()) {
@@ -485,3 +482,5 @@ const AnchorTable: React.FC<AnchorTableProps> = ({ anchors, loading = false }) =
 };
 
 export default AnchorTable;
+
+

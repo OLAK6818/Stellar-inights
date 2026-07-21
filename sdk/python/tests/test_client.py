@@ -3,7 +3,7 @@ import pytest
 import httpx
 import respx
 
-from stellar_insights import StellarInsights, StellarInsightsError
+from stellar_insights import StellarInsights, StellarInsightsError, RateLimitError
 
 BASE = "https://api.stellarinsights.io"
 
@@ -90,3 +90,15 @@ async def test_context_manager():
         )
         result = await client.network.info()
         assert result["network"] == "testnet"
+
+
+@respx.mock
+async def test_raises_rate_limit_error_after_max_retries():
+    client = StellarInsights(api_key="test-key", max_retries=2, retry_delay=0)
+    respx.get(f"{BASE}/api/anchors").mock(
+        return_value=httpx.Response(429, json={"error": "RATE_LIMITED", "message": "Too many requests"})
+    )
+    with pytest.raises(RateLimitError) as exc_info:
+        await client.anchors.list()
+    assert exc_info.value.status == 429
+    assert isinstance(exc_info.value, StellarInsightsError)

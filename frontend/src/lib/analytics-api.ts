@@ -38,6 +38,47 @@ export interface SettlementLatencyDataPoint {
   p99_latency_ms: number;
 }
 
+export interface BalanceHistoryDataPoint {
+  timestamp: string;
+  balance_usd: number;
+  asset_code: string;
+  asset_issuer?: string;
+}
+
+export interface WalletBalanceHistoryResponse {
+  address: string;
+  balance_history: BalanceHistoryDataPoint[];
+}
+
+export interface ActivityDay {
+  date: string;
+  count: number;
+}
+
+export interface WalletActivityCalendarResponse {
+  address: string;
+  activity: ActivityDay[];
+}
+
+export type TransferDirection = "in" | "out";
+
+export interface LargestTransfer {
+  id: string;
+  transaction_hash: string;
+  counterparty: string;
+  direction: TransferDirection;
+  amount: number;
+  asset_code: string;
+  asset_issuer?: string;
+  amount_usd: number;
+  timestamp: string;
+}
+
+export interface WalletLargestTransfersResponse {
+  address: string;
+  transfers: LargestTransfer[];
+}
+
 export interface AnalyticsMetrics {
   top_corridors: CorridorAnalytics[];
   liquidity_history: LiquidityDataPoint[];
@@ -148,6 +189,186 @@ export function getMockApiUsageOverview(): ApiUsageOverview {
       { status_code: 401, count: 30 },
     ],
   };
+}
+
+export async function fetchWalletBalanceHistory(address: string): Promise<WalletBalanceHistoryResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/api/wallets/${address}/balance-history`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    const isNetworkError = error instanceof TypeError &&
+      (error.message.includes('Failed to fetch') ||
+        error.message.includes('fetch is not defined') ||
+        error.message.includes('Network request failed'));
+
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet balance history:", error instanceof Error ? error : new Error(String(error)));
+    }
+
+    return getMockWalletBalanceHistory(address);
+  }
+}
+
+export function getMockWalletBalanceHistory(address: string): WalletBalanceHistoryResponse {
+  const now = new Date();
+  const lastSevenDays = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() - (6 - i));
+    return date;
+  });
+
+  const assets = [
+    { asset_code: "XLM", asset_issuer: undefined },
+    { asset_code: "USDC", asset_issuer: "GBUQWP3BOUZX34LOCALEXAMPLE" },
+  ];
+
+  const balanceHistory: BalanceHistoryDataPoint[] = lastSevenDays.flatMap((date) =>
+    assets.map((asset) => ({
+      timestamp: date.toISOString(),
+      balance_usd: asset.asset_code === "XLM" 
+        ? 500 + Math.random() * 200 + (date.getTime() - lastSevenDays[0].getTime()) * 0.001
+        : 1200 + Math.random() * 400 + (date.getTime() - lastSevenDays[0].getTime()) * 0.003,
+      asset_code: asset.asset_code,
+      asset_issuer: asset.asset_issuer,
+    }))
+  );
+
+  return {
+    address,
+    balance_history: balanceHistory,
+  };
+}
+
+export async function fetchWalletActivityCalendar(
+  address: string,
+  days = 365,
+): Promise<WalletActivityCalendarResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/v1/wallets/${address}/activity-calendar?days=${days}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    const isNetworkError = error instanceof TypeError &&
+      (error.message.includes('Failed to fetch') ||
+        error.message.includes('fetch is not defined') ||
+        error.message.includes('Network request failed'));
+
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet activity calendar:", error instanceof Error ? error : new Error(String(error)));
+    }
+
+    return getMockWalletActivityCalendar(address, days);
+  }
+}
+
+export function getMockWalletActivityCalendar(
+  address: string,
+  days = 365,
+): WalletActivityCalendarResponse {
+  const now = new Date();
+  const activity: ActivityDay[] = Array.from({ length: days }, (_, i) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() - (days - 1 - i));
+    // Deterministic-ish pseudo-random activity so mock data looks organic
+    // without relying on Math.random for every render.
+    const seed = (date.getDate() * 31 + date.getMonth() * 7) % 11;
+    const count = seed < 5 ? 0 : Math.min(seed - 4, 8);
+    return {
+      date: date.toISOString().slice(0, 10),
+      count,
+    };
+  }).filter((d) => d.count > 0);
+
+  return { address, activity };
+}
+
+export async function fetchWalletLargestTransfers(
+  address: string,
+  limit = 20,
+): Promise<WalletLargestTransfersResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/v1/wallets/${address}/largest-transfers?limit=${limit}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    const isNetworkError = error instanceof TypeError &&
+      (error.message.includes('Failed to fetch') ||
+        error.message.includes('fetch is not defined') ||
+        error.message.includes('Network request failed'));
+
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet largest transfers:", error instanceof Error ? error : new Error(String(error)));
+    }
+
+    return getMockWalletLargestTransfers(address, limit);
+  }
+}
+
+export function getMockWalletLargestTransfers(
+  address: string,
+  limit = 20,
+): WalletLargestTransfersResponse {
+  const now = new Date();
+  const assets: { code: string; issuer?: string; usdPerUnit: number }[] = [
+    { code: "XLM", usdPerUnit: 0.12 },
+    { code: "USDC", issuer: "GBUQWP3BOUZX34LOCALEXAMPLE", usdPerUnit: 1 },
+    { code: "BTC", issuer: "GDXTJEK4JZNSTNQAWA53RZNS2GIKTDRPEUWDXELFMKU52XNECNVDVXDI", usdPerUnit: 62000 },
+  ];
+
+  const transfers: LargestTransfer[] = Array.from({ length: limit }, (_, i) => {
+    const asset = assets[i % assets.length];
+    const amount = (limit - i) * (asset.code === "BTC" ? 0.05 : 1000);
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+
+    return {
+      id: `mock-${i}`,
+      transaction_hash: `mockhash${i}`,
+      counterparty: `GMOCKCOUNTERPARTY${i.toString().padStart(2, "0")}EXAMPLE`,
+      direction: i % 2 === 0 ? "out" : "in",
+      amount,
+      asset_code: asset.code,
+      asset_issuer: asset.issuer,
+      amount_usd: amount * asset.usdPerUnit,
+      timestamp: date.toISOString(),
+    };
+  }).sort((a, b) => b.amount_usd - a.amount_usd);
+
+  return { address, transfers };
 }
 
 export function getMockAnalyticsData(): AnalyticsMetrics {

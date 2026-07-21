@@ -1,0 +1,351 @@
+name: CI Quality Gates
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ── Frontend: coverage thresholds (80 % across all metrics) ──────────────
+  frontend-coverage:
+    name: Frontend – Vitest coverage ≥ 80 %
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests with coverage (thresholds enforced by vitest.config.ts)
+        run: pnpm vitest run --coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 14
+
+  # ── Frontend: ESLint lint gate ────────────────────────────────────────────
+  frontend-lint:
+    name: Frontend – ESLint lint gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm eslint . --ext .ts,.tsx --max-warnings 0
+
+  # ── Frontend: accessibility gate ─────────────────────────────────────────
+  frontend-a11y:
+    name: Frontend – axe-core WCAG AA
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run accessibility tests
+        run: >
+          pnpm vitest run --reporter=verbose
+          src/components/__tests__/accessibility.a11y.test.tsx
+
+      - name: Upload accessibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-report
+          path: frontend/a11y-report/
+          retention-days: 14
+
+  # ── Backend: Clippy lint gate ─────────────────────────────────────────────
+  backend-lint:
+    name: Backend – Clippy lint gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable + clippy)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-clippy-
+
+      # Issue #127: panic-prevention lints in backend/Cargo.toml are
+      # `warn` by default; this gate promotes them to `deny` ONLY for the
+      # library target (production code). Tests keep their idiomatic
+      # `.unwrap()`/`.expect()` calls but are still linted at warn level so
+      # regressions remain visible.
+      - name: Clippy lib (deny panic-lints) + tests (warn)
+        working-directory: backend
+        run: |
+          cargo clippy --lib -- \
+            -W clippy::all \
+            -D warnings \
+            -D clippy::unwrap_used \
+            -D clippy::expect_used \
+            -D clippy::panic
+          cargo clippy --tests -- -W clippy::all
+
+  # ── Backend: coverage gate ≥ 70 % ────────────────────────────────────────
+  backend-coverage:
+    name: Backend – cargo llvm-cov ≥ 70 %
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable + llvm-tools)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-cov-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-cov-
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+
+      - name: Run tests with coverage
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite::memory:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: |
+          cargo llvm-cov \
+            --all-features \
+            --workspace \
+            --lcov --output-path lcov.info \
+            --fail-under-fns 70
+
+      - name: Upload coverage (LCOV)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-lcov
+          path: backend/lcov.info
+          retention-days: 14
+
+  # ── Mobile: TypeScript type-check ────────────────────────────────────────
+  mobile-typecheck:
+    name: Mobile – TypeScript type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: mobile/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Type-check
+        run: yarn type-check
+
+  # ── Mobile: ESLint lint gate ──────────────────────────────────────────────
+  mobile-lint:
+    name: Mobile – ESLint lint gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: mobile/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Lint
+        run: yarn lint
+
+  # ── Cross-platform smoke test ─────────────────────────────────────────────
+  cross-platform-smoke:
+    name: Cross-platform startup smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run smoke tests (all platforms)
+        run: bash scripts/smoke-test-all.sh
+
+  # ── Multi-layer regression harness ────────────────────────────────────────
+  regression-harness:
+    name: Multi-layer regression harness (backend/frontend/mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: yarn install --frozen-lockfile
+
+      - name: Run regression harness (all layers)
+        run: bash scripts/run-regression-harness.sh
+
+  # ── Workflow definitions self-check ──────────────────────────────────────
+  workflow-definitions-check:
+    name: Validate workflow YAML definitions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required workflows exist
+        run: |
+          REQUIRED=(
+            ".github/workflows/quality-compliance.yml"
+            ".github/workflows/ci-quality.yml"
+            ".github/workflows/coverage.yml"
+            ".github/workflows/clippy.yml"
+            ".github/workflows/accessibility.yml"
+          )
+          MISSING=()
+          for f in "${REQUIRED[@]}"; do
+            [[ -f "$f" ]] || MISSING+=("$f")
+          done
+          if [[ ${#MISSING[@]} -gt 0 ]]; then
+            echo "Missing required workflow files:"
+            printf '  %s\n' "${MISSING[@]}"
+            exit 1
+          fi
+          echo "All required workflow files present."
+
+      - name: Validate YAML syntax
+        run: |
+          for f in .github/workflows/*.yml; do
+            python3 -c "import yaml, sys; yaml.safe_load(open('$f'))" \
+              && echo "  ✓ $f" \
+              || { echo "  ✗ $f: invalid YAML"; exit 1; }
+          done
+
+  # ── Final gate ────────────────────────────────────────────────────────────
+  ci-quality-gate:
+    name: CI quality gate
+    needs:
+      - frontend-coverage
+      - frontend-lint
+      - frontend-a11y
+      - backend-lint
+      - backend-coverage
+      - mobile-typecheck
+      - mobile-lint
+      - cross-platform-smoke
+      - regression-harness
+      - workflow-definitions-check
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Evaluate gate
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more CI quality gates failed."
+            exit 1
+          fi
+          echo "All CI quality gates passed."

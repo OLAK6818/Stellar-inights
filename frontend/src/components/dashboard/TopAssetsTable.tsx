@@ -1,5 +1,7 @@
 import React from 'react';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Share2 } from 'lucide-react';
 
 interface Asset {
     symbol: string;
@@ -12,6 +14,12 @@ interface Asset {
 interface TopAssetsTableProps {
     assets: Asset[];
 }
+
+const handleShare = (asset: Asset) => {
+    const shareText = `Check out ${asset.symbol} (${asset.name}) on Stellar Insights! Price: $${asset.price < 1 ? asset.price.toFixed(4) : asset.price.toLocaleString(undefined, { minimumFractionDigits: 2})}, 24h Change: ${asset.change24h > 0 ? '+' : ''}${asset.change24h}%`;
+    const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(shareUrl, '_blank');
+};
 
 export const TopAssetsTable: React.FC<TopAssetsTableProps> = ({ assets }) => {
     return (
@@ -29,6 +37,7 @@ export const TopAssetsTable: React.FC<TopAssetsTableProps> = ({ assets }) => {
                             <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Price</th>
                             <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Change</th>
                             <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Volume (24h)</th>
+                            <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Share</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
@@ -57,6 +66,17 @@ export const TopAssetsTable: React.FC<TopAssetsTableProps> = ({ assets }) => {
                                         currency: 'USD',
                                         notation: 'compact'
                                     }).format(asset.volume24h)}
+                                </td>
+                                <td className="py-4 text-right">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleShare(asset)}
+                                        aria-label={`Share ${asset.symbol} on X/Twitter`}
+                                        className="h-8 w-8 hover:bg-accent/20"
+                                    >
+                                        <Share2 className="h-4 w-4" />
+                                    </Button>
                                 </td>
                             </tr>
                         ))}
