@@ -4,6 +4,7 @@
  *   GET /api/v1/soroban/contract-calls
  *   GET /api/v1/soroban/top-contracts
  *   GET /api/v1/soroban/new-deployments
+ *   GET /api/v1/soroban/gas-usage           (backend#23)
  *   GET /api/v1/soroban/active-contracts    (backend#21)
  *
  * New deployments may be partial until contracts-repo deployment/init
@@ -56,6 +57,17 @@ export interface SorobanContractCallsResponse {
   metric: "events";
 }
 
+export interface SorobanGasUsageResponse {
+  /** Total gas consumed across all contracts. */
+  total_gas: number;
+  /** Average gas per transaction/operation. */
+  avg_gas?: number;
+  /** Optional time window label. */
+  window?: string;
+  /** Optional trend percentage. */
+  trend?: number;
+  /** Set to true when backend#23 hasn't landed yet. */
+  coming_soon?: boolean;
 export interface SorobanActiveContractsResponse {
   /** Total count of active contracts. */
   count: number;
@@ -193,6 +205,30 @@ export async function fetchSorobanNewDeployments(
 }
 
 /**
+ * Gas usage statistics (backend#23).
+ * Returns coming_soon: true when the backend endpoint hasn't landed yet
+ * (404 / 501 response), so the dashboard can show an explicit placeholder
+ * rather than an error state.
+ */
+export async function fetchSorobanGasUsage(
+  window = "7d",
+): Promise<SorobanGasUsageResponse> {
+  const url = `${API_BASE}/api/v1/soroban/gas-usage?window=${encodeURIComponent(window)}`;
+  try {
+    const data = await fetchJson<SorobanGasUsageResponse>(url);
+    return {
+      total_gas: typeof data.total_gas === "number" ? data.total_gas : 0,
+      avg_gas: typeof data.avg_gas === "number" ? data.avg_gas : undefined,
+      window: data.window ?? window,
+      trend: typeof data.trend === "number" ? data.trend : undefined,
+      coming_soon: Boolean(data.coming_soon),
+    };
+  } catch (error) {
+    // 404 / 501 means backend#23 hasn't landed yet — surface "coming soon"
+    const isNotImplemented =
+      error instanceof Error &&
+      (error.message.includes("404") || error.message.includes("501"));
+
  * Active contracts count (backend#21).
  * Returns zero count when backend is unavailable.
  */
@@ -212,6 +248,16 @@ export async function fetchSorobanActiveContracts(
       error instanceof TypeError &&
       (error.message.includes("Failed to fetch") ||
         error.message.includes("Network request failed"));
+
+    if (!isNetworkError && !isNotImplemented) {
+      logger.error("Failed to fetch Soroban gas usage:", error);
+    }
+
+    return {
+      total_gas: 0,
+      window,
+      coming_soon: true,
+    };
     if (!isNetworkError) {
       logger.error("Failed to fetch Soroban active contracts:", error);
     }

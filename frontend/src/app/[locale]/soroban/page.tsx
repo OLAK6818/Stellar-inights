@@ -5,11 +5,17 @@ import dynamic from "next/dynamic";
 import { Code2, RefreshCw } from "lucide-react";
 import { TopContractsTable } from "@/components/soroban/TopContractsTable";
 import { NewDeploymentsList } from "@/components/soroban/NewDeploymentsList";
+import { GasUsagePanel } from "@/components/soroban/GasUsagePanel";
 import { ActiveContractsPanel } from "@/components/soroban/ActiveContractsPanel";
 import {
   fetchSorobanContractCalls,
   fetchSorobanNewDeployments,
   fetchSorobanTopContracts,
+  fetchSorobanGasUsage,
+  type SorobanContractCallsResponse,
+  type SorobanNewDeploymentsResponse,
+  type SorobanTopContractsResponse,
+  type SorobanGasUsageResponse,
   fetchSorobanActiveContracts,
   type SorobanContractCallsResponse,
   type SorobanNewDeploymentsResponse,
@@ -42,6 +48,8 @@ export default function SorobanPage() {
     useState<SorobanNewDeploymentsResponse | null>(null);
   const [contractCalls, setContractCalls] =
     useState<SorobanContractCallsResponse | null>(null);
+  const [gasUsage, setGasUsage] =
+    useState<SorobanGasUsageResponse | null>(null);
   const [activeContracts, setActiveContracts] =
     useState<SorobanActiveContractsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,16 +60,19 @@ export default function SorobanPage() {
     else setLoading(true);
 
     try {
+      const [contractsData, deploymentsData, callsData, gasData] =
       const [contractsData, deploymentsData, callsData, activeData] =
         await Promise.all([
           fetchSorobanTopContracts(20, "7d"),
           fetchSorobanNewDeployments(20),
           fetchSorobanContractCalls(30),
+          fetchSorobanGasUsage("7d"),
           fetchSorobanActiveContracts("7d"),
         ]);
       setTopContracts(contractsData);
       setDeployments(deploymentsData);
       setContractCalls(callsData);
+      setGasUsage(gasData);
       setActiveContracts(activeData);
     } catch (error) {
       logger.error("Failed to load Soroban dashboard panels:", error);
@@ -73,6 +84,7 @@ export default function SorobanPage() {
           "New deployments data is unavailable or incomplete until contract deployment/init events are fully ingested.",
       });
       setContractCalls({ points: [], metric: "events" });
+      setGasUsage({ total_gas: 0, window: "7d", coming_soon: true });
       setActiveContracts({ count: 0, window: "7d" });
     } finally {
       setLoading(false);
@@ -119,6 +131,14 @@ export default function SorobanPage() {
         loading={loading}
       />
 
+      {/* Gas Usage Stat Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <GasUsagePanel
+          totalGas={gasUsage?.total_gas ?? 0}
+          avgGas={gasUsage?.avg_gas}
+          window={gasUsage?.window}
+          trend={gasUsage?.trend}
+          comingSoon={gasUsage?.coming_soon}
       {/* Active Contracts Stat Panel */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <ActiveContractsPanel
