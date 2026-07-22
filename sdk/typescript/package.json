@@ -16,7 +16,8 @@
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "generate-bindings": "./scripts/generate-bindings.sh"
   },
   "keywords": ["stellar", "sdk", "payments", "analytics", "request-deduplication"],
   "keywords": ["stellar", "sdk", "payments", "analytics", "network-context"],

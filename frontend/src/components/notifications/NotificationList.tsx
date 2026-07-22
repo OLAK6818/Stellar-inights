@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { Bell, BellOff, X, CheckCircle, AlertCircle, AlertTriangle, Info, ExternalLink, MoreVertical, Eye, Trash2, Copy } from 'lucide-react';
-import { BaseNotification, NotificationType, NotificationPriority } from '@/types/notifications';
+import React, { useCallback } from 'react';
+import { BellOff, CheckCircle, AlertCircle, AlertTriangle, Info, ExternalLink, MoreVertical, Eye, Trash2, Copy } from 'lucide-react';
+import { BaseNotification } from '@/types/notifications';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,28 +21,11 @@ const NOTIFICATION_ICONS = {
   info: Info,
 };
 
-const TYPE_COLORS: {
-  success: string;
-  error: string;
-  warning: string;
-  info: string;
-} = {
+const TYPE_COLORS: Record<string, string> = {
   success: 'text-green-500',
   error: 'text-red-500',
   warning: 'text-yellow-500',
   info: 'text-blue-500',
-};
-
-const PRIORITY_COLORS: {
-  low: string;
-  medium: string;
-  high: string;
-  critical: string;
-} = {
-  low: 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900',
-  medium: 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20',
-  high: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20',
-  critical: 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20',
 };
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -51,7 +34,6 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   showActions = true,
 }) => {
   const { markAsRead, clearNotification } = useNotifications();
-  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleMarkAsRead = useCallback(() => {
     markAsRead(notification.id);
@@ -67,24 +49,21 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   }, [notification]);
 
   const handleSelect = useCallback(() => {
-    if (onSelect) {
-      onSelect(notification);
-    }
+    onSelect?.(notification);
     if (!notification.read) {
       handleMarkAsRead();
     }
   }, [onSelect, notification, handleMarkAsRead]);
 
   const IconComponent = NOTIFICATION_ICONS[notification.type];
-  const priorityColor = PRIORITY_COLORS[notification.priority];
   const typeColor = TYPE_COLORS[notification.type];
 
   return (
     <article
       className={`
         relative p-4 rounded-lg border transition-all cursor-pointer
-        ${notification.read 
-          ? 'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700' 
+        ${notification.read
+          ? 'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700'
           : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
         }
         hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600
@@ -102,15 +81,15 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     >
       {/* Priority Indicator */}
       {notification.priority === 'critical' && (
-        <div className="absolute -left-1 top-0 bottom-0 w-1 bg-red-500 rounded-l-lg" />
+        <div className="absolute -left-1 top-0 bottom-0 w-1 bg-red-500 rounded-l-lg" aria-hidden="true" />
       )}
 
       <div className="flex items-start gap-3">
         {/* Icon */}
         <div className="shrink-0 mt-0.5">
-          {React.createElement(IconComponent, { 
+          {React.createElement(IconComponent, {
             'aria-hidden': true,
-            className: `h-5 w-5 ${typeColor}` 
+            className: `h-5 w-5 ${typeColor}`,
           })}
         </div>
 
@@ -128,22 +107,22 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
               {notification.category}
             </Badge>
             {!notification.read && (
-              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+              <div
+                className="w-2 h-2 bg-blue-500 rounded-full"
+                aria-label="Unread"
+                role="status"
+              />
             )}
           </div>
-          
+
           <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
             {notification.message}
           </p>
-          
+
           <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-            <span>
-              {new Date(notification.timestamp).toLocaleString()}
-            </span>
+            <span>{new Date(notification.timestamp).toLocaleString()}</span>
             {notification.metadata?.source && (
-              <span>
-                Source: {notification.metadata.source as string}
-              </span>
+              <span>Source: {notification.metadata.source as string}</span>
             )}
           </div>
         </div>
@@ -153,56 +132,45 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
           <div className="flex items-center gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Notification actions"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreVertical className="h-4 w-4" />
+                  <MoreVertical className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => {
-                  e.stopPropagation();
-                  handleMarkAsRead();
-                }}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMarkAsRead(); }}>
                   <Eye aria-hidden="true" className="h-4 w-4 mr-2" />
                   Mark as Read
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopy();
-                }}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopy(); }}>
                   <Copy aria-hidden="true" className="h-4 w-4 mr-2" />
                   Copy
                 </DropdownMenuItem>
                 {notification.metadata?.url && (
                   <DropdownMenuItem onClick={(e) => {
                     e.stopPropagation();
-                    window.open(notification.metadata.url as string, '_blank');
+                    window.open(notification.metadata!.url as string, '_blank', 'noopener,noreferrer');
                   }}>
                     <ExternalLink aria-hidden="true" className="h-4 w-4 mr-2" />
                     Open Link
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                {notification.actions?.map(action => (
+                {notification.actions?.map((action) => (
                   <DropdownMenuItem
                     key={action.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      action.onClick();
-                    }}
+                    onClick={(e) => { e.stopPropagation(); action.onClick(); }}
                   >
                     {action.label}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete();
-                  }}
+                <DropdownMenuItem
+                  onClick={(e) => { e.stopPropagation(); handleDelete(); }}
                   className="text-red-600"
                 >
                   <Trash2 aria-hidden="true" className="h-4 w-4 mr-2" />
@@ -213,7 +181,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 };
 
@@ -228,30 +196,29 @@ export const NotificationList: React.FC<NotificationListProps> = ({
   notifications,
   onNotificationSelect,
   emptyMessage = 'No notifications found',
-  emptyDescription = 'You\'re all caught up!',
+  emptyDescription = "You're all caught up!",
 }) => {
   if (notifications.length === 0) {
     return (
       <div className="text-center py-12">
-        <BellOff className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+        <BellOff className="h-12 w-12 mx-auto mb-4 text-gray-400" aria-hidden="true" />
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
           {emptyMessage}
         </h3>
-        <p className="text-gray-600 dark:text-gray-400">
-          {emptyDescription}
-        </p>
+        <p className="text-gray-600 dark:text-gray-400">{emptyDescription}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="list" aria-label="Notifications">
       {notifications.map((notification) => (
-        <NotificationItem
-          key={notification.id}
-          notification={notification}
-          onSelect={onNotificationSelect}
-        />
+        <div key={notification.id} role="listitem">
+          <NotificationItem
+            notification={notification}
+            onSelect={onNotificationSelect}
+          />
+        </div>
       ))}
     </div>
   );

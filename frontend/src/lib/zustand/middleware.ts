@@ -1,4 +1,5 @@
 import { StateCreator } from 'zustand';
+import { logger } from '@/lib/logger';
 
 /**
  * Logging middleware for Zustand store
@@ -9,7 +10,7 @@ export const loggerMiddleware: <T extends object>(
   return (set, get, api) => {
     const loggedSet = (...args: Parameters<typeof set>) => {
       if (config.enabled !== false && process.env.NODE_ENV === 'development') {
-        console.log(`[${config.name}] State update:`, args);
+        logger.debug(`[${config.name}] State update`, { args });
       }
       return set(...args);
     };
@@ -34,7 +35,7 @@ export const analyticsMiddleware: <T extends object>(
         if (typeof partialState === 'object' && partialState !== null) {
           Object.keys(partialState).forEach(key => {
             if (!config.events || config.events.includes(key)) {
-              console.log(`[Analytics] State change: ${key}`, partialState[key]);
+              logger.debug(`[Analytics] State change: ${key}`, { value: partialState[key] });
             }
           });
         }
@@ -63,7 +64,7 @@ export const performanceMiddleware: <T extends object>(
         const end = performance.now();
         
         if (end - start > 1) { // Only log if update takes more than 1ms
-          console.warn(`[Performance] Slow state update: ${(end - start).toFixed(2)}ms`);
+          logger.warn('[Performance] Slow state update', { durationMs: (end - start).toFixed(2) });
         }
       }
       
@@ -87,11 +88,11 @@ export const validationMiddleware: <T extends object>(
       if (config.validator && typeof partialState === 'object' && partialState !== null) {
         const result = config.validator(partialState);
         if (result === false) {
-          console.error('[Validation] State update rejected');
+          logger.error('[Validation] State update rejected');
           return;
         }
         if (typeof result === 'string') {
-          console.error(`[Validation] State update rejected: ${result}`);
+          logger.error(`[Validation] State update rejected: ${result}`);
           return;
         }
       }
@@ -183,7 +184,7 @@ export const localStorageMiddleware: <T extends object>(
           set(parsed as Partial<T>);
         }
       } catch (error) {
-        console.error(`[LocalStorage] Failed to load state for ${config.key}:`, error);
+        logger.error(`[LocalStorage] Failed to load state for ${config.key}`, error);
       }
     }
 
@@ -221,7 +222,7 @@ export const localStorageMiddleware: <T extends object>(
           
           localStorage.setItem(config.key, JSON.stringify(stateToSave));
         } catch (error) {
-          console.error(`[LocalStorage] Failed to save state for ${config.key}:`, error);
+          logger.error(`[LocalStorage] Failed to save state for ${config.key}`, error);
         }
       }
       

@@ -1,5 +1,6 @@
 "use client";
 import { logger } from "@/lib/logger";
+import { config } from "@/config";
 
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useState } from "react";
@@ -27,7 +28,7 @@ export function WebSocketDemo() {
   >([]);
 
   // Get WebSocket URL from environment
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "";
+  const wsUrl = config.wsUrl;
 
   // Main WebSocket connection
   const {

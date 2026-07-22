@@ -9,7 +9,7 @@ from typing import Any, Optional
 import httpx
 
 DEFAULT_BASE_URL = "https://api.stellarinsights.io"
-DEFAULT_MAX_RETRIES = 3
+DEFAULT_MAX_RETRIES = 5
 DEFAULT_RETRY_DELAY = 0.5  # seconds
 DEFAULT_TIMEOUT = 30.0  # seconds
 
@@ -27,6 +27,14 @@ class StellarInsightsError(Exception):
 
     def __repr__(self) -> str:
         return f"StellarInsightsError(status={self.status}, code={self.code!r}, message={str(self)!r})"
+
+
+class RateLimitError(StellarInsightsError):
+    """Raised when rate limit retries are exhausted."""
+
+    def __init__(self, message: str, retry_after: Optional[float] = None, request_id: Optional[str] = None) -> None:
+        super().__init__(status=429, code="RATE_LIMITED", message=message, request_id=request_id)
+        self.retry_after = retry_after
 
 
 class HttpClient:
@@ -80,6 +88,19 @@ class HttpClient:
                 delay = self._backoff(response, attempt)
                 await asyncio.sleep(delay)
                 continue
+
+            if response.status_code == 429:
+                retry_after_hdr = response.headers.get("Retry-After")
+                retry_after = float(retry_after_hdr) if retry_after_hdr and retry_after_hdr.isdigit() else None
+                try:
+                    body = response.json()
+                except Exception:
+                    body = {}
+                raise RateLimitError(
+                    message=body.get("message", "Rate limit exceeded after max retries"),
+                    retry_after=retry_after,
+                    request_id=body.get("request_id"),
+                )
 
             if not response.is_success:
                 self._raise_error(response)

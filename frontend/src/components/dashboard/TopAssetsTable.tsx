@@ -1,17 +1,31 @@
 import React from 'react';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Share2 } from 'lucide-react';
 
 interface Asset {
     symbol: string;
     name: string;
     volume24h: number;
     price: number;
-    change24h: number;
+    /** 24h % change, or `null`/`undefined` for an asset with no 24h-ago baseline. */
+    change24h: number | null;
+    /** New unique holders gained in the last 24h, when known. */
+    newHolders24h?: number;
 }
 
 interface TopAssetsTableProps {
     assets: Asset[];
 }
+
+const handleShare = (asset: Asset) => {
+    const changeText = typeof asset.change24h === 'number'
+        ? `${asset.change24h > 0 ? '+' : ''}${asset.change24h}%`
+        : 'N/A';
+    const shareText = `Check out ${asset.symbol} (${asset.name}) on Stellar Insights! Price: $${asset.price < 1 ? asset.price.toFixed(4) : asset.price.toLocaleString(undefined, { minimumFractionDigits: 2})}, 24h Change: ${changeText}`;
+    const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(shareUrl, '_blank');
+};
 
 export const TopAssetsTable: React.FC<TopAssetsTableProps> = ({ assets }) => {
     return (
@@ -28,7 +42,9 @@ export const TopAssetsTable: React.FC<TopAssetsTableProps> = ({ assets }) => {
                             <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">Asset Pair</th>
                             <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Price</th>
                             <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Change</th>
+                            <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">New Holders</th>
                             <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Volume (24h)</th>
+                            <th className="pb-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground text-right">Share</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
@@ -48,8 +64,23 @@ export const TopAssetsTable: React.FC<TopAssetsTableProps> = ({ assets }) => {
                                 <td className="py-4 text-right font-mono tabular-nums font-medium">
                                     ${asset.price < 1 ? asset.price.toFixed(4) : asset.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </td>
-                                <td className={`py-4 text-right font-mono tabular-nums font-bold ${asset.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {asset.change24h > 0 ? '+' : ''}{asset.change24h}%
+                                <td
+                                    className={`py-4 text-right font-mono tabular-nums font-bold ${
+                                        typeof asset.change24h !== 'number'
+                                            ? 'text-muted-foreground'
+                                            : asset.change24h >= 0
+                                                ? 'text-green-400'
+                                                : 'text-red-400'
+                                    }`}
+                                >
+                                    {typeof asset.change24h === 'number'
+                                        ? `${asset.change24h > 0 ? '+' : ''}${asset.change24h}%`
+                                        : '—'}
+                                </td>
+                                <td className="py-4 text-right font-mono tabular-nums text-muted-foreground">
+                                    {asset.newHolders24h !== undefined
+                                        ? `+${asset.newHolders24h.toLocaleString()}`
+                                        : '—'}
                                 </td>
                                 <td className="py-4 text-right font-mono tabular-nums text-muted-foreground">
                                     {new Intl.NumberFormat('en-US', {
@@ -57,6 +88,17 @@ export const TopAssetsTable: React.FC<TopAssetsTableProps> = ({ assets }) => {
                                         currency: 'USD',
                                         notation: 'compact'
                                     }).format(asset.volume24h)}
+                                </td>
+                                <td className="py-4 text-right">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleShare(asset)}
+                                        aria-label={`Share ${asset.symbol} on X/Twitter`}
+                                        className="h-8 w-8 hover:bg-accent/20"
+                                    >
+                                        <Share2 className="h-4 w-4" />
+                                    </Button>
                                 </td>
                             </tr>
                         ))}

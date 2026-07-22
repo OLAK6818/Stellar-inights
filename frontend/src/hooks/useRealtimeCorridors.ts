@@ -1,31 +1,32 @@
-import { useEffect, useState, useCallback } from "react";
-import { useWebSocket, WsMessage } from "./useWebSocket";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useWebSocket } from "./useWebSocket";
 import { logger } from "@/lib/logger";
+import { config } from "@/config";
+import {
+  WsCorridorUpdate,
+  WsHealthAlert,
+  WsNewPayment,
+  WsSubscriptionConfirm,
+  WsPing,
+  WsUnknownMessage,
+  isCorridorUpdate,
+  isHealthAlert,
+  isNewPayment,
+  isSubscriptionConfirm,
+  isPing,
+} from "@/lib/websocket-message-parser";
 
-export interface CorridorUpdate {
-  corridor_key: string;
+export interface CorridorUpdate extends WsCorridorUpdate {
   asset_a_code: string;
   asset_a_issuer: string;
   asset_b_code: string;
   asset_b_issuer: string;
-  success_rate?: number;
   health_score?: number;
-  last_updated?: string;
 }
 
-export interface HealthAlert {
-  corridor_id: string;
-  severity: "info" | "warning" | "error" | "critical";
-  message: string;
-  timestamp: string;
-}
+export type HealthAlert = WsHealthAlert;
 
-export interface NewPayment {
-  corridor_id: string;
-  amount: number;
-  successful: boolean;
-  timestamp: string;
-}
+export type NewPayment = WsNewPayment;
 
 export interface UseRealtimeCorridorsOptions {
   corridorKeys?: string[];
@@ -38,6 +39,7 @@ export interface UseRealtimeCorridorsOptions {
 export interface UseRealtimeCorridorsReturn {
   isConnected: boolean;
   isConnecting: boolean;
+  isStaleData: boolean;
   connectionAttempts: number;
   corridorUpdates: Map<string, CorridorUpdate>;
   healthAlerts: HealthAlert[];
@@ -59,53 +61,41 @@ export function useRealtimeCorridors(
     onNewPayment,
   } = options;
 
-// TODO: Intended for future use
   const [corridorUpdates, setCorridorUpdates] = useState<
     Map<string, CorridorUpdate>
   >(new Map());
   const [healthAlerts, setHealthAlerts] = useState<HealthAlert[]>([]);
   const [recentPayments, setRecentPayments] = useState<NewPayment[]>([]);
 
+  // Track current subscriptions for resubscription on reconnect
+  const subscribedKeysRef = useRef<string[]>([]);
+
   // Get WebSocket URL from environment or default
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws";
+  const wsUrl = config.wsUrl;
 
   const handleMessage = useCallback(
-    (message: WsMessage) => {
-      switch (message.type) {
-        case "corridor_update":
-          const corridorUpdate = message as CorridorUpdate;
-          setCorridorUpdates((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(corridorUpdate.corridor_key, corridorUpdate);
-            return newMap;
-          });
-          onCorridorUpdate?.(corridorUpdate);
-          break;
-
-        case "health_alert":
-          const healthAlert = message as HealthAlert;
-          setHealthAlerts((prev) => [healthAlert, ...prev].slice(0, 50)); // Keep last 50 alerts
-          onHealthAlert?.(healthAlert);
-          break;
-
-        case "new_payment":
-          if (enablePaymentStream) {
-            const payment = message as NewPayment;
-            setRecentPayments((prev) => [payment, ...prev].slice(0, 100)); // Keep last 100 payments
-            onNewPayment?.(payment);
-          }
-          break;
-
-        case "subscription_confirm":
-          logger.debug("Subscription confirmed:", message);
-          break;
-
-        case "ping":
-          // Handle ping/pong automatically
-          break;
-
-        default:
-          logger.debug("Unhandled WebSocket message:", message);
+    (message: WsCorridorUpdate | WsHealthAlert | WsNewPayment | WsSubscriptionConfirm | WsPing | WsUnknownMessage) => {
+      if (isCorridorUpdate(message)) {
+        setCorridorUpdates((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(message.corridor_key, message as CorridorUpdate);
+          return newMap;
+        });
+        onCorridorUpdate?.(message as CorridorUpdate);
+      } else if (isHealthAlert(message)) {
+        setHealthAlerts((prev) => [message, ...prev].slice(0, 50));
+        onHealthAlert?.(message);
+      } else if (isNewPayment(message)) {
+        if (enablePaymentStream) {
+          setRecentPayments((prev) => [message, ...prev].slice(0, 100));
+          onNewPayment?.(message);
+        }
+      } else if (isSubscriptionConfirm(message)) {
+        logger.debug("Subscription confirmed for channels:", message.channels);
+      } else if (isPing(message)) {
+        // Ignore pings silently
+      } else {
+        logger.debug("Unhandled WebSocket message type:", message.type);
       }
     },
     [enablePaymentStream, onCorridorUpdate, onHealthAlert, onNewPayment],
@@ -114,17 +104,25 @@ export function useRealtimeCorridors(
   const {
     isConnected,
     isConnecting,
+    isStaleData,
     connectionAttempts,
     subscribe,
     unsubscribe,
     reconnect,
   } = useWebSocket(wsUrl, {
+    staleDataThreshold: 30000, // 30 seconds without updates = stale
     onMessage: handleMessage,
     onOpen: () => {
       logger.debug("Connected to corridor WebSocket");
-      // Re-subscribe to corridors on reconnection
-      if (corridorKeys.length > 0) {
-        subscribeToCorridors(corridorKeys);
+      // Re-subscribe to all previously subscribed corridors on reconnection
+      const keys = subscribedKeysRef.current;
+      if (keys.length > 0) {
+        const channels = keys.map((key) => `corridor:${key}`);
+        if (enablePaymentStream) {
+          channels.push(...keys.map((key) => `payments:${key}`));
+        }
+        subscribe(channels);
+        logger.debug("Resubscribed to corridors after reconnect:", keys);
       }
     },
     onClose: () => {
@@ -133,10 +131,15 @@ export function useRealtimeCorridors(
     onError: (error) => {
       logger.error("Corridor WebSocket error:", error);
     },
+    onStaleData: () => {
+      logger.warn("Corridor data is stale - consider fetching snapshot");
+    },
   });
 
   const subscribeToCorridors = useCallback(
     (keys: string[]) => {
+      // Track subscribed keys for resubscription
+      subscribedKeysRef.current = keys;
       const channels = keys.map((key) => `corridor:${key}`);
       if (enablePaymentStream) {
         channels.push(...keys.map((key) => `payments:${key}`));
@@ -148,6 +151,10 @@ export function useRealtimeCorridors(
 
   const unsubscribeFromCorridors = useCallback(
     (keys: string[]) => {
+      // Remove unsubscribed keys from tracking
+      subscribedKeysRef.current = subscribedKeysRef.current.filter(
+        (k) => !keys.includes(k),
+      );
       const channels = keys.map((key) => `corridor:${key}`);
       if (enablePaymentStream) {
         channels.push(...keys.map((key) => `payments:${key}`));
@@ -171,6 +178,7 @@ export function useRealtimeCorridors(
   return {
     isConnected,
     isConnecting,
+    isStaleData,
     connectionAttempts,
     corridorUpdates,
     healthAlerts,

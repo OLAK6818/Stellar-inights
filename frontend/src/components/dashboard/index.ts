@@ -3,3 +3,4 @@ export { SettlementSpeedCard } from './SettlementSpeedCard';
 export { LiquidityDepthCard } from './LiquidityDepthCard';
 export { CorridorHealthCard } from './CorridorHealthCard';
 export { TopAssetsCard } from './TopAssetsCard';
+export { InsightsList } from './InsightsList';
