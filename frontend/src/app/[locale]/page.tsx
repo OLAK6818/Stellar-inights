@@ -33,6 +33,7 @@ export default function Home() {
     tvl: asset.volume24h,
     price: asset.price,
     change: asset.change24h,
+    newHolders24h: asset.newHolders24h,
   }));
 
   return (

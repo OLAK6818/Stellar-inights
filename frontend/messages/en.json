@@ -93,6 +93,13 @@
       "networkTvl": "Network TVL",
       "successRate": "Success Rate"
     },
+    "topMovers": {
+      "title": "24H MOVEMENT",
+      "heading": "Top Movers (24h)",
+      "live": "Live",
+      "loading": "Loading top movers…",
+      "empty": "No mover data available yet."
+    },
     "capabilities": {
       "globalCorridors": "Global Corridors",
       "globalCorridorsDesc": "Detailed health analysis of cross-border payment paths. Monitor uptime, liquidity bottlenecks, and anchor performance across 50+ fiat pairs.",
