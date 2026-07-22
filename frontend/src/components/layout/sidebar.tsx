@@ -27,6 +27,8 @@ import {
   Code2,
   Medal,
   Server,
+  Anchor,
+  FileCode2,
 } from "lucide-react";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -55,6 +57,11 @@ type NavGroup = {
  * - soroban → Soroban Activity (Contract List → Soroban Activity)
  * - wallet → Wallet Insights (Account Lookup → Wallet Insights)
  * Transaction Explorer → Transaction Analytics: no genuine existing match; skipped.
+ *
+ * Explorer (demoted lookup/tools — #176):
+ * - Raw lookup: transaction builder (`/transactions/builder` from components/transactions),
+ *   anchors directory (`/anchors` via components/tables), calculator
+ * - Demoted utilities remain here so they are not mixed into insight dashboards
  */
 const navGroups: NavGroup[] = [
   {
@@ -97,7 +104,11 @@ const navGroups: NavGroup[] = [
   {
     key: "explorer",
     items: [
+      // Raw transaction / ledger-style lookup surfaces
+      { key: "transactionBuilder", icon: FileCode2, path: "/transactions/builder" },
+      { key: "anchors", icon: Anchor, path: "/anchors" },
       { key: "calculator", icon: Calculator, path: "/calculator" },
+      // Demoted utilities (not insight dashboards)
       { key: "apiUsage", icon: Activity, path: "/analytics/api" },
       { key: "apiKeys", icon: Key, path: "/developer/keys" },
       { key: "quests", icon: Trophy, path: "/quests" },
