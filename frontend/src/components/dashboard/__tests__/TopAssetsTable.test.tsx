@@ -165,7 +165,8 @@ describe("TopAssetsTable", () => {
       },
     ];
     render(<TopAssetsTable assets={assetsWithSmallVolume} />);
-    expect(screen.getByText(/500/)).toBeTruthy();
+    // Anchored regex: unanchored /500/ also matches the $0.1500 price cell.
+    expect(screen.getByText(/^\$500$/)).toBeTruthy();
   });
 
   it("should render share button in each row", () => {
@@ -181,11 +182,12 @@ describe("TopAssetsTable", () => {
     
     expect(window.open).toHaveBeenCalledTimes(1);
     const callArgs = (window.open as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(callArgs[0]).toContain('twitter.com/intent/tweet');
-    expect(callArgs[0]).toContain('XLM');
-    expect(callArgs[0]).toContain('Stellar');
-    expect(callArgs[0]).toContain('0.1500');
-    expect(callArgs[0]).toContain('+5.2%');
+    const shareUrl = decodeURIComponent(callArgs[0] as string);
+    expect(shareUrl).toContain('twitter.com/intent/tweet');
+    expect(shareUrl).toContain('XLM');
+    expect(shareUrl).toContain('Stellar');
+    expect(shareUrl).toContain('0.1500');
+    expect(shareUrl).toContain('+5.2%');
     expect(callArgs[1]).toBe('_blank');
   });
 
@@ -193,22 +195,70 @@ describe("TopAssetsTable", () => {
     render(<TopAssetsTable assets={mockAssets} />);
     const btcShareButton = screen.getByLabelText(/Share BTC on X\/Twitter/i);
     fireEvent.click(btcShareButton);
-    
+
     const callArgs = (window.open as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(callArgs[0]).toContain('BTC');
-    expect(callArgs[0]).toContain('Bitcoin');
-    expect(callArgs[0]).toContain('45,000.50');
-    expect(callArgs[0]).toContain('+0.8%');
+    const shareUrl = decodeURIComponent(callArgs[0] as string);
+    expect(shareUrl).toContain('BTC');
+    expect(shareUrl).toContain('Bitcoin');
+    expect(shareUrl).toContain('45,000.50');
+    expect(shareUrl).toContain('+0.8%');
   });
 
   it("should format share text correctly for negative change", () => {
     render(<TopAssetsTable assets={mockAssets} />);
     const usdcShareButton = screen.getByLabelText(/Share USDC on X\/Twitter/i);
     fireEvent.click(usdcShareButton);
-    
+
     const callArgs = (window.open as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(callArgs[0]).toContain('USDC');
-    expect(callArgs[0]).toContain('USD Coin');
-    expect(callArgs[0]).toContain('-2.3%');
+    const shareUrl = decodeURIComponent(callArgs[0] as string);
+    expect(shareUrl).toContain('USDC');
+    expect(shareUrl).toContain('USD Coin');
+    expect(shareUrl).toContain('-2.3%');
+  });
+
+  describe("New Holders column", () => {
+    it("should render the New Holders header", () => {
+      render(<TopAssetsTable assets={mockAssets} />);
+      expect(screen.getByText("New Holders")).toBeTruthy();
+    });
+
+    it("should render a dash when newHolders24h is not provided", () => {
+      render(<TopAssetsTable assets={mockAssets} />);
+      const xlmRow = screen.getByText("XLM").closest("tr");
+      const holdersCell = xlmRow?.querySelector("td:nth-child(4)");
+      expect(holdersCell?.textContent).toBe("—");
+    });
+
+    it("should render new-holder counts with a leading + and thousands separators", () => {
+      const assetsWithHolders = [
+        { symbol: "AQUA", name: "Aquarius", volume24h: 4_120_000, price: 0.00234, change24h: 18.4, newHolders24h: 12_341 },
+      ];
+      render(<TopAssetsTable assets={assetsWithHolders} />);
+      expect(screen.getByText("+12,341")).toBeTruthy();
+    });
+  });
+
+  describe("no 24h-ago baseline (null change)", () => {
+    const newAsset = [
+      { symbol: "NEWX", name: "New Asset", volume24h: 12_800, price: 0.0041, change24h: null, newHolders24h: 87 },
+    ];
+
+    it("should render a neutral dash instead of a red/green percentage", () => {
+      render(<TopAssetsTable assets={newAsset} />);
+      const row = screen.getByText("NEWX").closest("tr");
+      const changeCell = row?.querySelector("td:nth-child(3)");
+      expect(changeCell?.textContent).toBe("—");
+      expect(changeCell?.className).not.toContain("text-red-400");
+      expect(changeCell?.className).not.toContain("text-green-400");
+    });
+
+    it("should share 'N/A' instead of a bogus percentage", () => {
+      render(<TopAssetsTable assets={newAsset} />);
+      fireEvent.click(screen.getByLabelText(/Share NEWX on X\/Twitter/i));
+
+      const callArgs = (window.open as ReturnType<typeof vi.fn>).mock.calls[0];
+      const shareUrl = decodeURIComponent(callArgs[0] as string);
+      expect(shareUrl).toContain("24h Change: N/A");
+    });
   });
 });

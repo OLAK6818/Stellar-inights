@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { fetchTopMovers } from "@/lib/top-movers-api";
 
 function normalizeBackendBaseUrl(url: string): string {
   const trimmed = url.trim().replace(/\/+$/, "");
@@ -157,27 +158,18 @@ export async function GET() {
       };
     });
 
-    // 3. Top Assets (Aggregate volume by source asset)
-    const assetMap = new Map<string, { volume: number; count: number }>();
-    corridors.forEach((c: BackendCorridor) => {
-      const symbol = c.source_asset.split(":")[0];
-      const current = assetMap.get(symbol) || { volume: 0, count: 0 };
-      assetMap.set(symbol, {
-        volume: current.volume + c.total_volume_usd,
-        count: current.count + 1,
-      });
-    });
-
-    const topAssets = Array.from(assetMap.entries())
-      .map(([symbol, data]) => ({
-        symbol,
-        name: symbol, // Could map full names if we had a dictionary
-        volume24h: data.volume,
-        price: 1.0, // Placeholder, would need oracle
-        change24h: 0.0,
-      }))
-      .sort((a, b) => b.volume24h - a.volume24h)
-      .slice(0, 5);
+    // 3. Top Assets / Top Movers (24h % change + new-holder count)
+    // Backed by fetchTopMovers(), which itself falls back to representative
+    // mock data until backend#33 ships — see lib/top-movers-api.ts.
+    const topMovers = await fetchTopMovers("change", 5);
+    const topAssets = topMovers.map((asset) => ({
+      symbol: asset.asset_code,
+      name: asset.asset_code, // Could map full names if we had a dictionary
+      volume24h: asset.volume_24h_usd,
+      price: asset.price_usd,
+      change24h: asset.change_24h_pct,
+      newHolders24h: asset.new_holders_24h,
+    }));
 
     // 4. Charts - Liquidity History (Simluated from current total)
     // Real implementation would need a history endpoint.
