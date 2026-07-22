@@ -4,6 +4,7 @@
  *   GET /api/v1/soroban/contract-calls
  *   GET /api/v1/soroban/top-contracts
  *   GET /api/v1/soroban/new-deployments
+ *   GET /api/v1/soroban/active-contracts    (backend#21)
  *
  * New deployments may be partial until contracts-repo deployment/init
  * events land (backend#24). The API surfaces that via `partial: true`.
@@ -53,6 +54,15 @@ export interface SorobanContractCallsResponse {
   points: SorobanContractCallPoint[];
   /** Documented definition: event rows, not distinct transactions. */
   metric: "events";
+}
+
+export interface SorobanActiveContractsResponse {
+  /** Total count of active contracts. */
+  count: number;
+  /** Optional time window label (e.g., "7d", "30d"). */
+  window?: string;
+  /** Optional trend percentage vs previous period. */
+  trend?: number;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -179,5 +189,32 @@ export async function fetchSorobanNewDeployments(
       notice:
         "New deployments data is unavailable or incomplete until contract deployment/init events are fully ingested.",
     };
+  }
+}
+
+/**
+ * Active contracts count (backend#21).
+ * Returns zero count when backend is unavailable.
+ */
+export async function fetchSorobanActiveContracts(
+  window = "7d",
+): Promise<SorobanActiveContractsResponse> {
+  const url = `${API_BASE}/api/v1/soroban/active-contracts?window=${encodeURIComponent(window)}`;
+  try {
+    const data = await fetchJson<SorobanActiveContractsResponse>(url);
+    return {
+      count: typeof data.count === "number" ? data.count : 0,
+      window: data.window ?? window,
+      trend: typeof data.trend === "number" ? data.trend : undefined,
+    };
+  } catch (error) {
+    const isNetworkError =
+      error instanceof TypeError &&
+      (error.message.includes("Failed to fetch") ||
+        error.message.includes("Network request failed"));
+    if (!isNetworkError) {
+      logger.error("Failed to fetch Soroban active contracts:", error);
+    }
+    return { count: 0, window };
   }
 }
