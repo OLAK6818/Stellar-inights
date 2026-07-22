@@ -181,3 +181,39 @@ export async function fetchSorobanNewDeployments(
     };
   }
 }
+
+export interface SorobanActiveContractsResponse {
+  active_count: number;
+  window: string;
+  change_pct?: number | null;
+  total_deployed?: number | null;
+}
+
+/**
+ * Count of unique contracts that emitted at least one event in a window.
+ * Returns zeros when the backend is unavailable so the panel can show an
+ * appropriate empty state rather than blocking the page.
+ */
+export async function fetchSorobanActiveContracts(
+  window = "7d",
+): Promise<SorobanActiveContractsResponse> {
+  const url = `${API_BASE}/api/v1/soroban/active-contracts?window=${encodeURIComponent(window)}`;
+  try {
+    const data = await fetchJson<SorobanActiveContractsResponse>(url);
+    return {
+      active_count: typeof data.active_count === "number" ? data.active_count : 0,
+      window: data.window ?? window,
+      change_pct: data.change_pct ?? null,
+      total_deployed: data.total_deployed ?? null,
+    };
+  } catch (error) {
+    const isNetworkError =
+      error instanceof TypeError &&
+      (error.message.includes("Failed to fetch") ||
+        error.message.includes("Network request failed"));
+    if (!isNetworkError) {
+      logger.error("Failed to fetch Soroban active contracts:", error);
+    }
+    return { active_count: 0, window, change_pct: null, total_deployed: null };
+  }
+}

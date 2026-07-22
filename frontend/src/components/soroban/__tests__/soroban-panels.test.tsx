@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NewDeploymentsList } from "../NewDeploymentsList";
 import { TopContractsTable } from "../TopContractsTable";
+import { ActiveContractsPanel } from "../ActiveContractsPanel";
+import { GasUsagePanel } from "../GasUsagePanel";
 import { ContractCallsChart } from "@/components/charts/ContractCallsChart";
 import {
   fetchSorobanContractCalls,
   fetchSorobanNewDeployments,
   fetchSorobanTopContracts,
+  fetchSorobanActiveContracts,
 } from "@/lib/soroban-api";
 
 describe("NewDeploymentsList", () => {
@@ -154,5 +157,111 @@ describe("fetchSorobanContractCalls normalization", () => {
       { date: "2026-07-01", count: 10 },
       { date: "2026-07-02", count: 20 },
     ]);
+  });
+});
+
+describe("ActiveContractsPanel", () => {
+  it("shows loading skeleton when loading=true", () => {
+    const { container } = render(
+      <ActiveContractsPanel stat={null} loading />,
+    );
+    expect(container.querySelector("[aria-busy='true']")).toBeInTheDocument();
+  });
+
+  it("shows empty state when stat is null and not loading", () => {
+    render(<ActiveContractsPanel stat={null} />);
+    expect(screen.getByText("No activity data yet")).toBeInTheDocument();
+  });
+
+  it("shows empty state when active_count is 0", () => {
+    render(
+      <ActiveContractsPanel
+        stat={{ active_count: 0, window: "7d", change_pct: null, total_deployed: null }}
+      />,
+    );
+    expect(screen.getByText("No activity data yet")).toBeInTheDocument();
+  });
+
+  it("renders active count with trend when data is present", () => {
+    render(
+      <ActiveContractsPanel
+        stat={{
+          active_count: 1234,
+          window: "7d",
+          change_pct: 12.5,
+          total_deployed: 9800,
+        }}
+      />,
+    );
+    // "1.2K" appears in both the hero value and the secondary stat cell — both are expected
+    expect(screen.getAllByText("1.2K").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("+12.5% vs prev window")).toBeInTheDocument();
+    // secondary stat (all-time)
+    expect(screen.getByText("9.8K")).toBeInTheDocument();
+  });
+
+  it("renders negative trend correctly", () => {
+    render(
+      <ActiveContractsPanel
+        stat={{ active_count: 500, window: "7d", change_pct: -8.3, total_deployed: null }}
+      />,
+    );
+    expect(screen.getByText("8.3% vs prev window")).toBeInTheDocument();
+  });
+});
+
+describe("GasUsagePanel", () => {
+  it("renders the coming-soon placeholder", () => {
+    render(<GasUsagePanel />);
+    expect(screen.getByText("Gas Usage")).toBeInTheDocument();
+    expect(screen.getByText("Coming Soon")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Pending: GET \/api\/v1\/soroban\/gas-usage/i),
+    ).toBeInTheDocument();
+  });
+
+  it("has accessible coming-soon status region", () => {
+    render(<GasUsagePanel />);
+    expect(
+      screen.getByRole("status", { name: /gas usage data coming soon/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("fetchSorobanActiveContracts", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns zero counts on network failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
+    );
+    const result = await fetchSorobanActiveContracts();
+    expect(result.active_count).toBe(0);
+    expect(result.window).toBe("7d");
+    expect(result.change_pct).toBeNull();
+  });
+
+  it("normalizes a valid API response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: async () => ({
+            active_count: 420,
+            window: "7d",
+            change_pct: 5.2,
+            total_deployed: 3100,
+          }),
+        }),
+      ),
+    );
+    const result = await fetchSorobanActiveContracts("7d");
+    expect(result.active_count).toBe(420);
+    expect(result.change_pct).toBe(5.2);
+    expect(result.total_deployed).toBe(3100);
   });
 });

@@ -5,13 +5,17 @@ import dynamic from "next/dynamic";
 import { Code2, RefreshCw } from "lucide-react";
 import { TopContractsTable } from "@/components/soroban/TopContractsTable";
 import { NewDeploymentsList } from "@/components/soroban/NewDeploymentsList";
+import { ActiveContractsPanel } from "@/components/soroban/ActiveContractsPanel";
+import { GasUsagePanel } from "@/components/soroban/GasUsagePanel";
 import {
   fetchSorobanContractCalls,
   fetchSorobanNewDeployments,
   fetchSorobanTopContracts,
+  fetchSorobanActiveContracts,
   type SorobanContractCallsResponse,
   type SorobanNewDeploymentsResponse,
   type SorobanTopContractsResponse,
+  type SorobanActiveContractsResponse,
 } from "@/lib/soroban-api";
 import { logger } from "@/lib/logger";
 
@@ -39,6 +43,8 @@ export default function SorobanPage() {
     useState<SorobanNewDeploymentsResponse | null>(null);
   const [contractCalls, setContractCalls] =
     useState<SorobanContractCallsResponse | null>(null);
+  const [activeContracts, setActiveContracts] =
+    useState<SorobanActiveContractsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -47,14 +53,17 @@ export default function SorobanPage() {
     else setLoading(true);
 
     try {
-      const [contractsData, deploymentsData, callsData] = await Promise.all([
-        fetchSorobanTopContracts(20, "7d"),
-        fetchSorobanNewDeployments(20),
-        fetchSorobanContractCalls(30),
-      ]);
+      const [contractsData, deploymentsData, callsData, activeData] =
+        await Promise.all([
+          fetchSorobanTopContracts(20, "7d"),
+          fetchSorobanNewDeployments(20),
+          fetchSorobanContractCalls(30),
+          fetchSorobanActiveContracts("7d"),
+        ]);
       setTopContracts(contractsData);
       setDeployments(deploymentsData);
       setContractCalls(callsData);
+      setActiveContracts(activeData);
     } catch (error) {
       logger.error("Failed to load Soroban dashboard panels:", error);
       setTopContracts({ window: "7d", contracts: [] });
@@ -65,6 +74,12 @@ export default function SorobanPage() {
           "New deployments data is unavailable or incomplete until contract deployment/init events are fully ingested.",
       });
       setContractCalls({ points: [], metric: "events" });
+      setActiveContracts({
+        active_count: 0,
+        window: "7d",
+        change_pct: null,
+        total_deployed: null,
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,6 +92,7 @@ export default function SorobanPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Page header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/50 pb-6">
         <div>
           <div className="text-[10px] font-mono text-accent uppercase tracking-[0.2em] mb-2">
@@ -87,8 +103,8 @@ export default function SorobanPage() {
             Soroban Activity
           </h1>
           <p className="text-muted-foreground text-sm max-w-xl mt-3">
-            Contract-call volume, top contracts, and recent deployments across the
-            Soroban network.
+            Contract-call volume, active contracts, gas usage, top contracts,
+            and recent deployments across the Soroban network.
           </p>
         </div>
         <button
@@ -105,11 +121,31 @@ export default function SorobanPage() {
         </button>
       </div>
 
+      {/* Panel 1: Contract Calls time-series chart (full width) */}
       <ContractCallsChart
         data={contractCalls?.points ?? []}
         loading={loading}
       />
 
+      {/* Panels 2 & 3: Active Contracts + Gas Usage (side by side) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <ActiveContractsPanel
+          stat={
+            activeContracts
+              ? {
+                  active_count: activeContracts.active_count,
+                  window: activeContracts.window,
+                  change_pct: activeContracts.change_pct,
+                  total_deployed: activeContracts.total_deployed,
+                }
+              : null
+          }
+          loading={loading}
+        />
+        <GasUsagePanel />
+      </div>
+
+      {/* Panels 4 & 5: Top Contracts + New Deployments (side by side) */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <TopContractsTable
           contracts={topContracts?.contracts ?? []}
