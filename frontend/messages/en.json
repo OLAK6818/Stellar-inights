@@ -164,6 +164,14 @@
       }
     }
   },
+  "trustlines": {
+    "title": "Asset Intelligence",
+    "subtitle": "Holder distribution, adoption signals, and transfer activity",
+    "loading": "Syncing Ledger States...",
+    "insightsTitle": "Asset Insights",
+    "noInsights": "Insufficient data to generate insights for this asset.",
+    "selectPrompt": "Select an asset from the leaderboard to view detailed insights"
+  },
   "dashboard": {
     "title": "Terminal",
     "successRate": "Success Rate",

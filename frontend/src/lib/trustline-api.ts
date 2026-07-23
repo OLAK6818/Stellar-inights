@@ -67,6 +67,31 @@ export async function fetchTrustlineRankings(
   }
 }
 
+export interface AssetInsights {
+  asset_code: string;
+  asset_issuer: string;
+  largest_holder_pct: number | null;
+  holder_growth_30d: number | null;
+  transfer_volume_30d: number | null;
+  avg_transfer_volume: number | null;
+  total_trustlines: number;
+}
+
+export async function fetchAssetInsights(
+  assetCode: string,
+  assetIssuer: string,
+): Promise<AssetInsights | null> {
+  const url = `${API_BASE_URL}/trustlines/${encodeURIComponent(assetCode)}/${encodeURIComponent(assetIssuer)}/insights`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 120 } });
+    if (!res.ok) return null;
+    return res.json();
+  } catch (err) {
+    logger.error("Error fetching asset insights:", err);
+    return null;
+  }
+}
+
 export async function fetchTrustlineHistory(
   assetCode: string,
   assetIssuer: string,
