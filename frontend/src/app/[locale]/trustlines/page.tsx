@@ -15,10 +15,13 @@ import {
   TrustlineStat,
   TrustlineSnapshot,
   TrustlineMetrics,
+  AssetInsights,
   fetchTrustlineStats,
   fetchTrustlineRankings,
   fetchTrustlineHistory,
+  fetchAssetInsights,
 } from "@/lib/trustline-api";
+import { AssetInsights as AssetInsightsPanel } from "@/components/trustlines/AssetInsights";
 import { logger } from "@/lib/logger";
 
 export default function TrustlinesPage() {
@@ -28,6 +31,8 @@ export default function TrustlinesPage() {
     null,
   );
   const [history, setHistory] = useState<TrustlineSnapshot[]>([]);
+  const [insights, setInsights] = useState<AssetInsights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,11 +50,12 @@ export default function TrustlinesPage() {
         if (rankingsData.length > 0) {
           const topAsset = rankingsData[0];
           setSelectedAsset(topAsset);
-          const historyData = await fetchTrustlineHistory(
-            topAsset.asset_code,
-            topAsset.asset_issuer,
-          );
+          const [historyData, insightsData] = await Promise.all([
+            fetchTrustlineHistory(topAsset.asset_code, topAsset.asset_issuer),
+            fetchAssetInsights(topAsset.asset_code, topAsset.asset_issuer),
+          ]);
           setHistory(historyData);
+          setInsights(insightsData);
         }
       } catch (error) {
         logger.error("Error loading trustline data:", error);
@@ -63,11 +69,14 @@ export default function TrustlinesPage() {
 
   const handleSelectAsset = async (asset: TrustlineStat) => {
     setSelectedAsset(asset);
-    const historyData = await fetchTrustlineHistory(
-      asset.asset_code,
-      asset.asset_issuer,
-    );
+    setInsightsLoading(true);
+    const [historyData, insightsData] = await Promise.all([
+      fetchTrustlineHistory(asset.asset_code, asset.asset_issuer),
+      fetchAssetInsights(asset.asset_code, asset.asset_issuer),
+    ]);
     setHistory(historyData);
+    setInsights(insightsData);
+    setInsightsLoading(false);
   };
 
   const formatNumber = (value: number) => {
@@ -99,14 +108,14 @@ export default function TrustlinesPage() {
             <Users className="w-5 h-5 text-accent" />
           </div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tighter uppercase italic">
-            Trustline
+            Asset
             <span className="text-accent underline decoration-accent/30 decoration-4 underline-offset-4 ml-2">
-              Analysis
+              Intelligence
             </span>
           </h1>
         </div>
         <p className="text-xs sm:text-sm font-mono text-muted-foreground uppercase tracking-widest mt-2 md:mt-0 pl-1 md:pl-14">
-          Monitor asset adoption, holder distribution, and network growth
+          Holder distribution, adoption signals, and transfer activity
         </p>
       </div>
 
@@ -264,6 +273,9 @@ export default function TrustlinesPage() {
                 data={history}
                 latestTotal={selectedAsset.total_trustlines}
               />
+
+              {/* Insights */}
+              <AssetInsightsPanel data={insights} loading={insightsLoading} />
 
               {/* Distribution */}
               <div className="glass-card rounded-2xl p-6 border border-border/50">

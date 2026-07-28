@@ -72,7 +72,7 @@ export function formatAddress(
 }
 
 /**
- * Validation message for address inputs (anchors, account lookups).
+ * Validation message for address inputs (anchors, Wallet Insights lookups).
  */
 export function getAddressValidationError(addr: string): string | null {
   const s = addr?.trim() ?? "";

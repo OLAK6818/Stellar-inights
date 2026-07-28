@@ -38,7 +38,10 @@ interface AssetData {
   name: string;
   volume24h: number;
   price: number;
-  change24h: number;
+  /** 24h % change, or `null` for an asset with no 24h-ago baseline. */
+  change24h: number | null;
+  /** New unique holders gained in the last 24h, when known. */
+  newHolders24h?: number;
 }
 
 interface SettlementData {

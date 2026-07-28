@@ -141,7 +141,10 @@ export function useLocalStorage<T>(
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [key]);
 
-  return [storedValue, setValue, removeValue];
+  const ttlMs = options?.ttlMs;
+  const isStale = ttlMs != null && (lastUpdated == null || Date.now() - lastUpdated > ttlMs);
+
+  return [storedValue, setValue, removeValue, { isStale, lastUpdated, invalidate }];
 }
 
 // --------------------------------------------------------------------------
@@ -303,8 +306,4 @@ export function useStaleLocalStorage<T>(
   })();
 
   return { value: storedValue, setValue, removeValue, invalidate, isStale, metadata };
-  const ttlMs = options?.ttlMs;
-  const isStale = ttlMs != null && (lastUpdated == null || Date.now() - lastUpdated > ttlMs);
-
-  return [storedValue, setValue, removeValue, { isStale, lastUpdated, invalidate }];
 }

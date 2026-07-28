@@ -16,17 +16,28 @@
   "layout": {
     "sidebar": {
       "stellarInsights": "INSIGHTS",
+      "groups": {
+        "overview": "Overview",
+        "assets": "Assets",
+        "wallets": "Wallets",
+        "soroban": "Soroban",
+        "rankings": "Rankings",
+        "validators": "Validators",
+        "explorer": "Explorer"
+      },
       "home": "Home",
       "terminal": "Terminal",
       "corridors": "Corridors",
       "network": "Network",
-      "analytics": "Analytics",
+      "analytics": "Network Metrics",
       "apiUsage": "API Usage",
-      "trustlines": "Trustlines",
+      "trustlines": "Asset Intelligence",
       "networkHealth": "Network Health",
       "liquidity": "Liquidity",
       "pools": "Pools",
       "sep6": "SEP-6",
+      "transactionBuilder": "Transaction Builder",
+      "anchors": "Anchors",
       "calculator": "Calculator",
       "apiKeys": "API Keys",
       "quests": "Quests",
@@ -36,9 +47,23 @@
       "collapse": "Collapse",
       "alerts": "Alerts",
       "performance": "Performance",
+      "walletInsights": "Wallet Insights",
+      "soroban": "Soroban Activity",
+      "rankings": "Rankings",
       "expandSidebar": "Expand Sidebar",
       "collapseSidebar": "Collapse Sidebar",
       "systemNominal": "System Nominal"
+    },
+    "walletInsights": {
+      "title": "Wallet Insights",
+      "subtitle": "Look up any Stellar account for portfolio, balances, and activity.",
+      "eyebrow": "Wallet Insights // Lookup",
+      "addressLabel": "Stellar address",
+      "addressPlaceholder": "G... or M...",
+      "submit": "View Wallet Insights",
+      "connectedShortcut": "View my wallet",
+      "invalidAddress": "Enter a valid Stellar G- or M-address.",
+      "breadcrumb": "Wallet Insights"
     }
   },
   "navbar": {
@@ -67,6 +92,13 @@
       "xlmEur": "XLM/EUR",
       "networkTvl": "Network TVL",
       "successRate": "Success Rate"
+    },
+    "topMovers": {
+      "title": "24H MOVEMENT",
+      "heading": "Top Movers (24h)",
+      "live": "Live",
+      "loading": "Loading top movers…",
+      "empty": "No mover data available yet."
     },
     "capabilities": {
       "globalCorridors": "Global Corridors",
@@ -131,6 +163,14 @@
         "other": "Other"
       }
     }
+  },
+  "trustlines": {
+    "title": "Asset Intelligence",
+    "subtitle": "Holder distribution, adoption signals, and transfer activity",
+    "loading": "Syncing Ledger States...",
+    "insightsTitle": "Asset Insights",
+    "noInsights": "Insufficient data to generate insights for this asset.",
+    "selectPrompt": "Select an asset from the leaderboard to view detailed insights"
   },
   "dashboard": {
     "title": "Terminal",

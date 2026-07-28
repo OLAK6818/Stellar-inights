@@ -14,18 +14,13 @@ import { useWallet } from "@/components/lib/wallet-context";
 import { HomeStatsTiles } from "@/components/dashboard/HomeStatsTiles";
 import { TopAssetsCard } from "@/components/dashboard/TopAssetsCard";
 import { useTopMovers } from "@/hooks/useTopMovers";
+import { useHomeStats } from "@/hooks/useHomeStats";
 
 export default function Home() {
   const { isConnected, connectWallet, isConnecting } = useWallet();
   const t = useTranslations("home");
   const { data: movers, loading: moversLoading, error: moversError } = useTopMovers(5);
-
-  const statsTiles = [
-    { labelKey: "usdcBrl" as const, value: "0.998", change: "+0.02%" },
-    { labelKey: "xlmEur" as const, value: "3.1s", change: "-120ms" },
-    { labelKey: "networkTvl" as const, value: "$45.2M", change: "+5.5%" },
-    { labelKey: "successRate" as const, value: "99.98%", change: "+0.1%" },
-  ];
+  const homeStats = useHomeStats();
 
   const topMoversAssets = movers.map((asset) => ({
     asset: asset.symbol,
@@ -33,6 +28,7 @@ export default function Home() {
     tvl: asset.volume24h,
     price: asset.price,
     change: asset.change24h,
+    newHolders24h: asset.newHolders24h,
   }));
 
   return (
@@ -80,7 +76,7 @@ export default function Home() {
       </section>
 
       {/* Live Intelligence Strip */}
-      <HomeStatsTiles tiles={statsTiles} t={t} />
+      <HomeStatsTiles {...homeStats} t={t} />
 
       <section className="rounded-[2rem] border border-border/50 bg-background/50 p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-4">
