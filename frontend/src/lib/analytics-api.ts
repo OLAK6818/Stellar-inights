@@ -191,6 +191,233 @@ export function getMockApiUsageOverview(): ApiUsageOverview {
   };
 }
 
+// ─── Wallet dashboard types ────────────────────────────────────────────────
+
+export interface WalletPortfolioSnapshot {
+  address: string;
+  total_value_usd: number;
+  change_24h_usd: number;
+  change_24h_pct: number;
+  total_assets: number;
+  total_transactions_30d: number;
+  last_activity: string; // ISO timestamp
+}
+
+export interface WalletAssetAllocation {
+  asset_code: string;
+  asset_issuer?: string;
+  balance: number;
+  value_usd: number;
+  pct_of_portfolio: number;
+}
+
+export interface WalletAllocationResponse {
+  address: string;
+  allocations: WalletAssetAllocation[];
+}
+
+export interface WalletActivityDay {
+  date: string; // YYYY-MM-DD
+  count: number; // number of transactions on that day
+}
+
+export interface WalletActivityResponse {
+  address: string;
+  activity: WalletActivityDay[];
+}
+
+export type TransferDirection = "in" | "out";
+
+export interface WalletTransfer {
+  id: string;
+  timestamp: string;
+  direction: TransferDirection;
+  asset_code: string;
+  asset_issuer?: string;
+  amount: number;
+  amount_usd: number;
+  counterparty: string; // Stellar address of the other party
+  memo?: string;
+  successful: boolean;
+}
+
+export interface WalletTransfersResponse {
+  address: string;
+  transfers: WalletTransfer[];
+}
+
+// ─── Wallet API fetchers ───────────────────────────────────────────────────
+
+export async function fetchWalletPortfolio(address: string): Promise<WalletPortfolioSnapshot> {
+  try {
+    const response = await fetch(`${API_BASE}/api/wallets/${address}/portfolio`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return response.json();
+  } catch (error) {
+    const isNetworkError =
+      error instanceof TypeError &&
+      (error.message.includes("Failed to fetch") ||
+        error.message.includes("fetch is not defined") ||
+        error.message.includes("Network request failed"));
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet portfolio:", error instanceof Error ? error : new Error(String(error)));
+    }
+    return getMockWalletPortfolio(address);
+  }
+}
+
+export async function fetchWalletAllocation(address: string): Promise<WalletAllocationResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/api/wallets/${address}/allocation`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return response.json();
+  } catch (error) {
+    const isNetworkError =
+      error instanceof TypeError &&
+      (error.message.includes("Failed to fetch") ||
+        error.message.includes("fetch is not defined") ||
+        error.message.includes("Network request failed"));
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet allocation:", error instanceof Error ? error : new Error(String(error)));
+    }
+    return getMockWalletAllocation(address);
+  }
+}
+
+export async function fetchWalletActivity(address: string): Promise<WalletActivityResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/api/wallets/${address}/activity`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return response.json();
+  } catch (error) {
+    const isNetworkError =
+      error instanceof TypeError &&
+      (error.message.includes("Failed to fetch") ||
+        error.message.includes("fetch is not defined") ||
+        error.message.includes("Network request failed"));
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet activity:", error instanceof Error ? error : new Error(String(error)));
+    }
+    return getMockWalletActivity(address);
+  }
+}
+
+export async function fetchWalletTransfers(address: string): Promise<WalletTransfersResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/api/wallets/${address}/transfers`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return response.json();
+  } catch (error) {
+    const isNetworkError =
+      error instanceof TypeError &&
+      (error.message.includes("Failed to fetch") ||
+        error.message.includes("fetch is not defined") ||
+        error.message.includes("Network request failed"));
+    if (!isNetworkError) {
+      logger.error("Failed to fetch wallet transfers:", error instanceof Error ? error : new Error(String(error)));
+    }
+    return getMockWalletTransfers(address);
+  }
+}
+
+// ─── Mock data generators ──────────────────────────────────────────────────
+
+export function getMockWalletPortfolio(address: string): WalletPortfolioSnapshot {
+  const totalValue = 1800 + Math.random() * 600;
+  const change24hUsd = (Math.random() - 0.4) * 120;
+  return {
+    address,
+    total_value_usd: totalValue,
+    change_24h_usd: change24hUsd,
+    change_24h_pct: (change24hUsd / totalValue) * 100,
+    total_assets: 3,
+    total_transactions_30d: 14 + Math.floor(Math.random() * 20),
+    last_activity: new Date(Date.now() - Math.random() * 86400000 * 3).toISOString(),
+  };
+}
+
+export function getMockWalletAllocation(address: string): WalletAllocationResponse {
+  const assets = [
+    { asset_code: "XLM", asset_issuer: undefined, balance: 4200, value_usd: 630 },
+    { asset_code: "USDC", asset_issuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN", balance: 900, value_usd: 900 },
+    { asset_code: "yXLM", asset_issuer: "PAXOS_ISSUER_EXAMPLE_000000000000000000000000000000000000", balance: 200, value_usd: 270 },
+  ];
+  const total = assets.reduce((s, a) => s + a.value_usd, 0);
+  return {
+    address,
+    allocations: assets.map((a) => ({
+      ...a,
+      pct_of_portfolio: (a.value_usd / total) * 100,
+    })),
+  };
+}
+
+export function getMockWalletActivity(address: string): WalletActivityResponse {
+  const today = new Date();
+  const activity: WalletActivityDay[] = [];
+  for (let i = 364; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0];
+    // Sparse activity — most days are quiet
+    const rand = Math.random();
+    activity.push({
+      date: dateStr,
+      count: rand < 0.65 ? 0 : rand < 0.85 ? 1 : rand < 0.94 ? 2 : rand < 0.98 ? 4 : 7,
+    });
+  }
+  return { address, activity };
+}
+
+export function getMockWalletTransfers(address: string): WalletTransfersResponse {
+  const assets = ["XLM", "USDC", "yXLM"];
+  const counterparties = [
+    "GBUQWP3BOUZX34LOCALEXAMPLE1111111111111111111111111111A",
+    "GDUVOLYZKFKDQM2CNXXXX2222222222222222222222222222222222",
+    "GBPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
+    "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGBK2KVT6XUJAUJ9K33Y94",
+  ];
+
+  const transfers: WalletTransfer[] = Array.from({ length: 20 }, (_, i) => {
+    const direction: TransferDirection = Math.random() > 0.5 ? "in" : "out";
+    const assetCode = assets[Math.floor(Math.random() * assets.length)];
+    const amount = assetCode === "USDC"
+      ? parseFloat((50 + Math.random() * 950).toFixed(2))
+      : parseFloat((100 + Math.random() * 5000).toFixed(4));
+    const amountUsd = assetCode === "USDC" ? amount : amount * 0.15;
+    const daysAgo = i * 1.5;
+    return {
+      id: `tx_mock_${i}_${address.slice(0, 6)}`,
+      timestamp: new Date(Date.now() - daysAgo * 86400000).toISOString(),
+      direction,
+      asset_code: assetCode,
+      asset_issuer: assetCode !== "XLM" ? "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN" : undefined,
+      amount,
+      amount_usd: amountUsd,
+      counterparty: counterparties[Math.floor(Math.random() * counterparties.length)],
+      memo: Math.random() > 0.6 ? `payment-ref-${Math.floor(Math.random() * 9999)}` : undefined,
+      successful: Math.random() > 0.05,
+    };
+  });
+
+  // Sort by most recent first, then take the largest 10 by USD value
+  const sorted = [...transfers].sort((a, b) => b.amount_usd - a.amount_usd).slice(0, 10);
+
+  return { address, transfers: sorted };
+}
+
 export async function fetchWalletBalanceHistory(address: string): Promise<WalletBalanceHistoryResponse> {
   try {
     const response = await fetch(`${API_BASE}/api/wallets/${address}/balance-history`, {
